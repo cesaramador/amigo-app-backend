@@ -1,0 +1,43 @@
+{
+    "id_tipousuario": 1,
+    "nombre": "Cesar",
+    "ap_paterno": "Amador",
+    "ap_materno": "Sanchez",
+    "fecha_nacimiento": "1972-04-30",
+    "telefono_personal": "3123201211",
+    "telefono_contacto": "3123201211",
+    "email": "cesar.amador@outlook.com",
+    "codigo": "0",
+    "id_estado": 6,
+    "id_municipio": 1,
+    "colonia": "Conocida",
+    "calle": "Conocida",
+    "numero_int": "1",
+    "numero_ext": "1A",
+    "codigo_postal": "28000",
+    "razon_social": "Ninguno",
+    "rfc": "Ninguno",
+    "fecha_registro": "0000-00-00",
+    "id_genero": 1,
+    "id_estatus_usuario": 1,
+    "id_estatus_marital": 1,
+    "id_categoria_vivienda": 1
+}
+
+
+
+{
+    "telefono_personal": "3123201211",
+    "codigo": "53352"
+}
+
+
+************************************ CREATE USER TOKEN
+"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMxMjMyMDEyMTEiLCJpYXQiOjE3NjQ2OTU3NDUsImV4cCI6MTc2NDc4MjE0NX0.02rnULKqNhUAqiuyAX3nAIST9aiYdBP0REBavnFJmz0",
+    "codigoHash": "$2b$10$aA.QDmJDucfrVQXYEtTnR.Y7NYgIS86Yqr0GmSKfWFtC6XZXGFUjC",
+    "codigoPlain": "53352"
+
+
+************************************ ACCESS LOGIN TOKEN (TOKEN USADO PARA LA AUTORIZACIÓN)
+"token": eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMxMjMyMDEyMTEiLCJpYXQiOjE3NjQ2OTU5MDcsImV4cCI6MTc2NDc4MjMwN30.Xyu5nFCFhkh7U9GdDbiteGiUNcEhWJFZ0b_s5hUHnzo
+
