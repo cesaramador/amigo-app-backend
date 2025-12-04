@@ -7,7 +7,6 @@ import { usuariosGet,
     usuarioDelete } 
     from '../../controllers/usuarios/usuarios.controller.js';
 import autorizaAcceso from '../../middleware/auth.middleware.js';
-//import errormiddleware from '../../middleware/error.middleware.js';
 
 const usuarioRouter = Router();
 

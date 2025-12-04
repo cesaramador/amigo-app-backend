@@ -3,7 +3,7 @@ import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
 // Obtener todas las vistas
-export const vistasGet = async (req, res) => {
+export const vistasGet = async (req, res, next) => {
     const t = await sequelize.transaction(); // iniciar transacción
 
     try {
@@ -18,15 +18,16 @@ export const vistasGet = async (req, res) => {
     } catch (error) {
         await t.rollback(); // revertir si hay error
         console.error("Error en vistasGet:", error);
-        return res.status(500).json({
-            error: "Error al obtener las vistas"
-        });
+        // return res.status(500).json({
+        //     error: "Error al obtener las vistas"
+        // });
+        return next(error);
     }
 };
 
 
 // Obtener una vista por ID
-export const vistaGetById = async (req, res) => {
+export const vistaGetById = async (req, res, next) => {
     const { id } = req.params;
     const t = await sequelize.transaction(); // iniciar transacción
 
@@ -45,9 +46,10 @@ export const vistaGetById = async (req, res) => {
         await t.rollback(); // revertir cambios ante error
         console.error("Error en vistaGetById:", error);
 
-        return res.status(500).json({
-            error: 'Error al obtener la vista'
-        });
+        // return res.status(500).json({
+        //     error: 'Error al obtener la vista'
+        // });
+        return next(error);
     }
 };
 
@@ -123,27 +125,11 @@ export const vistaPost = async (req, res, next) => {
             await transaction.rollback();
         }
         
-        console.error('Error en vistaPost:', error.message || error);
-        
-        // Manejar errores específicos de Sequelize
-        if (error.name === 'SequelizeValidationError') {
-            error.message = 'Error de validación en los datos de la vista';
-            error.statusCode = 400;
-        } else if (error.name === 'SequelizeUniqueConstraintError') {
-            error.message = 'La vista ya existe';
-            error.statusCode = 409;
-        } else if (error.name === 'SequelizeDatabaseError') {
-            error.message = 'Error en la base de datos';
-            error.statusCode = 500;
-        }
-        
-        // Usar el middleware de errores
+        console.error('Error en vistaPost:', error.message || error);        
         return next(error);
     }
 };
 
-// Actualizar una vista por ID
-// Actualizar una vista por ID
 // Actualizar una vista por ID
 export const vistaPut = async (req, res, next) => {
     let transaction;
@@ -255,22 +241,7 @@ export const vistaPut = async (req, res, next) => {
             await transaction.rollback();
         }
         
-        console.error('Error en vistaPut:', error.message || error);
-        
-        // Manejar errores específicos de Sequelize
-        if (error.name === 'SequelizeValidationError') {
-            error.message = 'Error de validación en los datos de la vista';
-            error.statusCode = 400;
-        } else if (error.name === 'SequelizeUniqueConstraintError') {
-            error.message = 'Ya existe otra vista con ese nombre';
-            error.statusCode = 409;
-        } else if (error.name === 'SequelizeDatabaseError') {
-            error.message = 'Error en la base de datos';
-            error.statusCode = 500;
-        } else if (error.name === 'SequelizeForeignKeyConstraintError') {
-            error.message = 'No se puede actualizar debido a restricciones de integridad referencial';
-            error.statusCode = 409;
-        }
+        console.error('Error en vistaPut:', error.message || error);     
         
         // Usar el middleware de errores
         return next(error);
@@ -278,7 +249,6 @@ export const vistaPut = async (req, res, next) => {
 };
 
 
-// Actualizar parcialmente una vista por ID
 // Actualizar parcialmente una vista por ID
 export const vistaPatch = async (req, res, next) => {
     let transaction;
@@ -422,29 +392,12 @@ export const vistaPatch = async (req, res, next) => {
         }
         
         console.error('Error en vistaPatch:', error.message || error);
-        
-        // Manejar errores específicos de Sequelize
-        if (error.name === 'SequelizeValidationError') {
-            const errores = error.errors.map(err => err.message).join(', ');
-            error.message = `Error de validación: ${errores}`;
-            error.statusCode = 400;
-        } else if (error.name === 'SequelizeUniqueConstraintError') {
-            error.message = 'Ya existe otra vista con ese nombre';
-            error.statusCode = 409;
-        } else if (error.name === 'SequelizeDatabaseError') {
-            error.message = 'Error en la base de datos';
-            error.statusCode = 500;
-        } else if (error.name === 'SequelizeForeignKeyConstraintError') {
-            error.message = 'No se puede actualizar debido a restricciones de integridad referencial';
-            error.statusCode = 409;
-        }
-        
+       
         // Usar el middleware de errores
         return next(error);
     }
 };
 
-// Eliminar una vista por ID
 // Eliminar una vista por ID
 export const vistaDelete = async (req, res, next) => {
     let transaction;
@@ -568,35 +521,6 @@ export const vistaDelete = async (req, res, next) => {
         }
         
         console.error('Error en vistaDelete:', error.message || error);
-        
-        // Manejar errores específicos de Sequelize
-        if (error.name === 'SequelizeDatabaseError') {
-            // Verificar si es error de FK constraint
-            if (error.message.includes('foreign key constraint') || error.message.includes('FOREIGN KEY')) {
-                error.message = 'No se puede eliminar la vista porque tiene registros asociados en otras tablas';
-                error.statusCode = 409;
-            } else {
-                error.message = 'Error en la base de datos';
-                error.statusCode = 500;
-            }
-        } else if (error.name === 'SequelizeForeignKeyConstraintError') {
-            error.message = 'No se puede eliminar la vista porque tiene registros asociados en otras tablas';
-            error.statusCode = 409;
-            // Opcional: Obtener información de la constraint
-            // error.data = { 
-            //     table: error.parent.table,
-            //     constraint: error.parent.constraint 
-            // };
-        } else if (error.name === 'SequelizeUniqueConstraintError') {
-            error.message = 'Error de restricción única';
-            error.statusCode = 409;
-        } else if (error.name === 'SequelizeValidationError') {
-            error.message = 'Error de validación';
-            error.statusCode = 400;
-        } else if (error.name === 'SequelizeTimeoutError') {
-            error.message = 'Tiempo de espera agotado en la operación';
-            error.statusCode = 504;
-        }
         
         // Usar el middleware de errores
         return next(error);

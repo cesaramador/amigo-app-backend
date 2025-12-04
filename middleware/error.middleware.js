@@ -1,56 +1,87 @@
-const errormiddleware = (err, req, res, next) => {
-    try {
-        let error = { ...err };
-        error.message = err.message;
-        console.log(err);
+// middleware/error.middleware.js
 
-        // mysql duplicate key error
-        if(err.code === 'ER_DUP_ENTRY') {
-            const message = `Duplicate field value entered: ${err.sqlMessage.match(/'.*?'/)[0]}`;
-            error = new Error(message);
-            error.statusCode = 400;
-        }
-        // mysql cast error
-        if(err.name === 'RequestError') {
-            const message = `Resource not found. Invalid: ${err.path}`;
-            error = new Error(message);
-            error.statusCode = 400;
+/**
+ * Middleware Global de Manejo de Errores
+ * Captura todos los errores que surgen en la aplicación,
+ * incluidos errores en rutas, controladores, base de datos,
+ * validaciones, JWT, etc.
+ */
 
-        }
-        // validation error
-        if(err.name === 'ValidationError') {
-            const message = Object.values(err.errors).map(val => val.message).join(', ');
-            error = new Error(message);
-            error.statusCode = 400;
-        }
-        // wrong JWT error
-        if(err.name === 'JsonWebTokenError') {
-            const message = 'JSON Web Token is invalid. Try again';
-            error = new Error(message);
-            error.statusCode = 401;
-        }
-        // expired JWT error
-        if(err.name === 'TokenExpiredError') {
-            const message = 'JSON Web Token is expired. Try again';
-            error = new Error(message);
-            error.statusCode = 401;
-        }
-        // server error
-        res.status(error.statusCode || 500).json({
-            success: false,
-            error: error.message || 'Server Error'
-        })
-        
-    } catch (error) {
-        next(error);
+import { NODE_ENV } from "../config/env.js";
+
+export const errorMiddleware = (err, req, res) => {
+    console.error("🔥 Error capturado por middleware:", err);
+
+    // Estructura base del error
+    let statusCode = err.statusCode || 500;
+    let message = err.message || "Error interno del servidor";
+
+    // -------------------------
+    // ERRORES DE SEQUELIZE
+    // -------------------------
+
+    // Error de validación (campos requeridos, formato inválido, etc.)
+    if (err.name === "SequelizeValidationError") {
+        statusCode = 400;
+        message = err.errors.map(e => e.message).join(", ");
     }
-  };    
 
-  export default errormiddleware;
+    // Error por clave duplicada
+    if (err.name === "SequelizeUniqueConstraintError") {
+        statusCode = 409;
+        message = `Valor duplicado en: ${err.errors.map(e => e.path).join(", ")}`;
+    }
 
+    // Error por FK (relaciones inválidas)
+    if (err.name === "SequelizeForeignKeyConstraintError") {
+        statusCode = 400;
+        message = `Violación de llave foránea en el campo: ${err.index}`;
+    }
 
-// 2xx Success codes, e.g., 200 OK or 201 Created
-// 3xx Redirection codes, indicating that further action needs to be taken by the client
-// 4xx Client error codes, e.g., 404 Not Found or 401 Unauthorized
-// 5xx Server error codes, e.g., 500 Internal Server Error
+    // Error general de BD
+    if (err.name === "SequelizeDatabaseError") {
+        statusCode = 400;
+        message = err.original?.sqlMessage || "Error en la base de datos";
+    }
 
+    // -------------------------
+    // ERRORES DE MYSQL NATIVOS
+    // -------------------------
+
+    if (err.code === "ER_DUP_ENTRY") {
+        statusCode = 409;
+        message = `Clave duplicada: ${err.sqlMessage.match(/'.*?'/)?.[0] || ""}`;
+    }
+
+    if (err.code === "ER_NO_REFERENCED_ROW_2") {
+        statusCode = 400;
+        message = "Referencia inválida. El registro relacionado no existe.";
+    }
+
+    // -------------------------
+    // ERRORES DE JWT
+    // -------------------------
+
+    if (err.name === "JsonWebTokenError") {
+        statusCode = 401;
+        message = "Token inválido";
+    }
+
+    if (err.name === "TokenExpiredError") {
+        statusCode = 401;
+        message = "Token expirado";
+    }
+
+    // -------------------------
+    // RESPUESTA ESTÁNDAR
+    // -------------------------
+
+    return res.status(statusCode).json({
+        success: false,
+        status: statusCode,
+        message,
+        path: req.originalUrl,
+        // Mostrar stack SOLO en desarrollo
+        ...(NODE_ENV === "development" && { stack: err.stack })
+    });
+};

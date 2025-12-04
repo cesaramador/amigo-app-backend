@@ -24,15 +24,17 @@ import vistaRouter from './routes/matriz/vistas.routes.js';
 import matrizaccesorouter from './routes/matriz/matrizacceso.routes.js';
 
 // importar rutas para proveedores
-//import proveedorRouter from './routes/proveedores/proveedores.routes.js';
+// import proveedorRouter from './routes/proveedores/proveedores.routes.js';
 
-// import errormiddleware from './middleware/error.middleware.js';
 import cookieParser from 'cookie-parser';
 import session from "express-session";
 import { SESSION_SECRET, NODE_ENV } from './config/env.js';
 
 // importar CORS middleware personalizado
 import { corsMiddleware } from './middleware/corsmiddleware.js';
+
+// importar middleware de manejo de errores
+import { errorMiddleware } from "./middleware/error.middleware.js";
 
 // ********************************************************************************************
 // ********************************************************************************************
@@ -47,7 +49,40 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser()); // para obtener cookies, no es para datos sensibles
-// app.use(errormiddleware);
+
+// Seguridad global avanzada
+app.disable("x-powered-by");  // Ocultar framework
+
+// Límite de payloads (evita ataques DoS por grandes cargas)
+app.use(express.json({ limit: "200kb" }));
+app.use(express.urlencoded({ limit: "200kb", extended: true }));
+
+// Middleware de sanitización básica
+app.use((req, res, next) => {
+    const forbidden = ["$", "{", "}", "<", ">", ";"];
+    const bodyStr = JSON.stringify(req.body);
+    const queryStr = JSON.stringify(req.query);
+
+    if (forbidden.some(char => bodyStr.includes(char) || queryStr.includes(char))) {
+        return res.status(400).json({
+            success: false,
+            message: "Solicitud con caracteres no permitidos"
+        });
+    }
+    next();
+});
+
+// Middleware para permitir solo métodos comunes
+app.use((req, res, next) => {
+    const allowedMethods = ["GET","POST","PUT","PATCH","DELETE","OPTIONS"];
+    if (!allowedMethods.includes(req.method)) {
+        return res.status(405).json({
+            success: false,
+            message: `Método HTTP no permitido: ${req.method}`
+        });
+    }
+    next();
+});
 
 // ********************************************************************************************
 // ********************************************************************************************
@@ -80,54 +115,8 @@ app.use(session({
 
 // ********************************************************************************************
 // ********************************************************************************************
-// configurar SharedPreferences
-// SharedPreferences.setName("amigoAppPrefs");
-
-// guardar SharedPreferences
-// SharedPreferences.setItem("myKey", "myValue");
-
-// obtener SharedPreferences
-// const value = await SharedPreferences.getItem("myKey");
-// console.log("SharedPreferences Value:", value);
-
-// borrar SharedPreferences
-// SharedPreferences.removeItem("myKey");
-
-
-// Guardar valor
-// await SharedPrefs.set("myKey", { logged: true, theme: "dark" });
-
-// Obtener valor
-// const prefs = await SharedPrefs.get("myKey");
-// console.log("SharedPreferences Value:", prefs);
-
-// Eliminar valor
-// await SharedPrefs.remove("myKey");
-
-
-
-// ********************************************************************************************
-// ********************************************************************************************
 // REGISTRO DE RUTAS
 // registrar rutas DESPUÉS de la definición de la session middleware
-
-// app.get('/', (req, res) => {
-//     // set a session variable
-//     req.session.amigo= req.sessionID;
-//     req.session.userTest = 'cesar.amador';
-//     const userTest = req.session.userTest || 'No session set';
-//     const idSession = req.session.amigo || 'No session set';
-//     console.log("ID de la sesión:", idSession);
-//     console.log(req.session.userTest);
-//     res.send(`Welcome ${userTest} to my API Server is running on http://localhost:${ PORT } and ID ${ idSession }`);
-// });
-
-// app.get('/get', (req, res) => {
-//     // retrieve the session variable
-//     const userTest = req.session.userTest || 'No session set';
-//     res.send(`Session variable: ${userTest}`);
-// });
-
 
 // registrar rutas para autenticación
 app.use('/api/v1/auth', authRouter);
@@ -163,6 +152,9 @@ app.use('/api/v1/categoriasviviendas', categoriasviviendaRouter);
 // api principal para los tipos de usuarios
 app.use('/api/v1/tiposusuarios', tiposusuarioRouter);
 
+// api principal para las encuestas
+//app.use('/api/v1/encuestas', encuestaRouter);
+
 // api principal para los grupos
 app.use('/api/v1/grupos', grupoRouter);
 
@@ -170,6 +162,33 @@ app.use('/api/v1/grupos', grupoRouter);
 //app.use('/api/v1/proveedores', proveedorRouter);
 
 
+// ********************************************************************************************
+// ********************************************************************************************
+// MIDDLEWARE GLOBAL PARA RUTAS NO ENCONTRADAS Y ERRORES
+
+// Manejo de rutas no encontradas
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: "Ruta no encontrada",
+        path: req.originalUrl
+    });
+});
+
+
+// Middleware Global para Errores
+app.use((err, req, res) => {
+    console.error("🔥 Error interno:", err);
+
+    return res.status(500).json({
+        success: false,
+        message: "Error interno del servidor",
+        error: NODE_ENV === "development" ? err.message : undefined
+    });
+});
+
+// Middleware Global de Errores
+app.use(errorMiddleware);
 
 
 // ********************************************************************************************

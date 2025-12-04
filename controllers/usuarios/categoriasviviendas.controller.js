@@ -41,8 +41,7 @@ export const categoriasviviendasGet = async (req, res, next) => {
         });
     } catch (error) {
         console.error('Error en categoriaviviendaGet:', error.message || error);
-        if (typeof next === 'function') return next(error);
-        return res.status(500).json({ success: false, message: 'Error al obtener categorías de vivienda' });
+        return next(error);
     }
 }
 
@@ -152,9 +151,6 @@ export const categoriaviviendaPut = async (req, res, next) => {
 
         return res.status(200).json({ success: true, message: 'Categoría actualizada exitosamente', data: updated });
     } catch (error) {
-        if (error.statusCode === 409) {
-            return res.status(409).json({ success: false, message: error.message });
-        }
         console.error('Error en categoriaviviendaPut:', error.message || error);
         return next(error);
     }
@@ -210,9 +206,6 @@ export const categoriaviviendaPatch = async (req, res, next) => {
 
         return res.status(200).json({ success: true, message: 'Categoría actualizada parcialmente', data: updated });
     } catch (error) {
-        if (error.statusCode === 409) {
-            return res.status(409).json({ success: false, message: error.message });
-        }
         console.error('Error en categoriaviviendaPatch:', error.message || error);
         return next(error);
     }

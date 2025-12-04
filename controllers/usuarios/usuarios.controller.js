@@ -116,7 +116,7 @@ export const usuarioGetById = async (req, res, next) => {
     }
 };
 
-export const usuarioPost = async (req, res) => {
+export const usuarioPost = async (req, res, next) => {
     try {
         console.log('Body recibido:', JSON.stringify(req.body)); // ver payload limpio
 
@@ -286,11 +286,13 @@ export const usuarioPost = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error en registrarUsuario:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Error interno en registro."
-        });
+        console.error('Error en usuarioPost:', error.message || error);
+        return next(error);
+        // console.error("Error en registrarUsuario:", error);
+        // return res.status(500).json({
+        //     success: false,
+        //     message: "Error interno en registro."
+        // });
     }
 };
 

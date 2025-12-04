@@ -111,19 +111,6 @@ export const municipioPost = async (req, res, next) => {
             return res.status(400).json({ success: false, message: `municipio supera ${maxLen} caracteres` });
         }
 
-        // Verificar existencia de estado si el modelo relaciona por id_estado
-        // intenta cargar Estado si existe en el proyecto (no obligatorio)
-        // try {
-        //     // eslint-disable-next-line no-unused-vars
-        //     const Estado = (await import('../../models/usuarios/estados.model.js')).default;
-        //     const estadoExist = await Estado.findByPk(id_estado);
-        //     if (!estadoExist) {
-        //         return res.status(404).json({ success: false, message: 'id_estado no existe' });
-        //     }
-        // } catch (e) {
-        //     // si no existe el modelo Estado en runtime, seguimos sin validarlo
-        // }
-
         // verificar duplicados: mismo id_estado + num_municipio o mismo nombre en el mismo estado
         const conflict = await Municipio.findOne({
             where: {
@@ -260,66 +247,6 @@ export const municipioPut = async (req, res, next) => {
         return next(error);
     }
 }
-
-// Actualizar parcialmente un municipio por id
-// export const municipiosPatch = async (req, res, next) => {
-//     try {
-//         const id = Number(req.params.id);
-//         if (!Number.isInteger(id) || id <= 0) {
-//             return res.status(400).json({ success: false, message: 'ID inválido' });
-//         }
-
-//         const { municipio } = req.body;
-//         if (typeof municipio === 'undefined') {
-//             return res.status(400).json({ success: false, message: 'Campo "municipio" requerido' });
-//         }
-//         if (typeof municipio !== 'string' || municipio.trim() === '') {
-//             return res.status(400).json({ success: false, message: 'Campo "municipio" inválido' });
-//         }
-//         const value = municipio.trim();
-
-//         // extraer longitud desde el modelo si existe
-//         const attrs = Municipio.rawAttributes || {};
-//         const maxLength = attrs.municipio?.type?.options?.length ?? 100;
-//         if (value.length > maxLength) {
-//             return res.status(400).json({ success: false, message: `El campo municipio no puede exceder ${maxLength} caracteres` });
-//         }
-
-//         // Actualizar dentro de transacción (verifica existencia y unicidad)
-//         const updated = await sequelize.transaction(async (t) => {
-//             const record = await Municipio.findByPk(id, { transaction: t });
-//             if (!record) return null;
-
-//             if (record.municipio !== value) {
-//                 const duplicate = await Municipio.findOne({ where: { municipio: value }, transaction: t });
-//                 if (duplicate) {
-//                     const err = new Error('El municipio ya existe');
-//                     err.statusCode = 409;
-//                     throw err;
-//                 }
-//             }
-
-//             await record.update({ municipio: value }, { transaction: t });
-//             return await Municipio.findByPk(id, { transaction: t });
-//         });
-
-//         if (updated === null) {
-//             return res.status(404).json({ success: false, message: 'Municipio no encontrado' });
-//         }
-
-//         return res.status(200).json({
-//             success: true,
-//             message: 'Municipio actualizado parcialmente',
-//             data: updated
-//         });
-//     } catch (error) {
-//         if (error.statusCode === 409) {
-//             return res.status(409).json({ success: false, message: error.message });
-//         }
-//         console.error('Error en municipiosPatch:', error.message || error);
-//         return next(error);
-//     }
-// }
 
 export const municipioPatch = async (req, res, next) => {
     try {
