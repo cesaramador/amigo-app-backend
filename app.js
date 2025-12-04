@@ -1,8 +1,6 @@
 // importar módulos necesarios y variables de entorno
 import express from 'express';
-import cors from 'cors';
 import { PORT } from './config/env.js';
-import { CORS_ALLOW } from './config/env.js';
 
 // importar conexión a la base de datos
 import connection from './database/mysql.js';
@@ -33,9 +31,8 @@ import cookieParser from 'cookie-parser';
 import session from "express-session";
 import { SESSION_SECRET, NODE_ENV } from './config/env.js';
 
-// importar SharedPreferences middleware
-// import SharedPrefs from './middleware/sharedprefs.middleware.js';
-// import SharedPreferences from "react-native-shared-preferences";
+// importar CORS middleware personalizado
+import { corsMiddleware } from './middleware/corsmiddleware.js';
 
 // ********************************************************************************************
 // ********************************************************************************************
@@ -55,26 +52,12 @@ app.use(cookieParser()); // para obtener cookies, no es para datos sensibles
 // ********************************************************************************************
 // ********************************************************************************************
 // CONFIGURACIÓN DE CORS
-// Colocar CORS antes de registrar rutas y antes de session middleware
+// Colocar CORS antes de registrar rutas, sesiones y middlewares
 
-const whitelist = (CORS_ALLOW || 'http://localhost:5500').split(',');
-const corsOptions = {
-    origin: (origin, callback) => {
-        // permitir solicitudes sin Origin (Postman, same-origin, server-to-server)
-        if (!origin) return callback(null, true);
-        if (whitelist.includes(origin)) return callback(null, true);
-        return callback(new Error('CORS policy: Origin not allowed'), false);
-    },
-    credentials: true,
-    methods: 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS',
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
-    exposedHeaders: ['Content-Range', 'X-Total-Count'],
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-};
+app.use(corsMiddleware());
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // manejar preflight
+// Preflight global
+app.options("*", corsMiddleware());
 
 // ********************************************************************************************
 // ********************************************************************************************
@@ -185,6 +168,8 @@ app.use('/api/v1/grupos', grupoRouter);
 
 // api principal para los proveedores
 //app.use('/api/v1/proveedores', proveedorRouter);
+
+
 
 
 // ********************************************************************************************

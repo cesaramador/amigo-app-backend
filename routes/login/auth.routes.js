@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { registrar, iniciar, abandonar } from '../../controllers/login/auth.controller.js';
+import { registrar, iniciar, abandonar, obtenerMunicipiosPorEstado } from '../../controllers/login/auth.controller.js';
 
 const authRouter = Router();
 
@@ -15,33 +15,8 @@ authRouter.post("/iniciar", iniciar);
 // salir de la sesión
 authRouter.post("/abandonar", abandonar);
 
+// path : /api/v1/auth/municipios/:id_estado (GET)
+// obtener municipios por estado
+authRouter.get("/municipios/:id_estado", obtenerMunicipiosPorEstado);
+
 export default authRouter;
-
-// ********************************************************************************************************************
-// ********************************************************************************************************************
-
-// import { login, register } from "../controllers/auth.controller.js";
-// import { validateSchema } from "../middlewares/validateSchema.js";
-// import { loginSchema, registerSchema } from "../schemas/auth.schemas.js";
-
-// ruteo sin validación de esquemas (ejemplos básicos)
-// authRouter.post("/sign-up", (req, res) => res.send({ title: "Sign-up endpoint" }));
-// authRouter.post("/sign-in", (req, res) => res.send({ title: "Sign-in endpoint" }));
-// authRouter.post("/sign-out", (req, res) => res.send({ title: "Sign-out endpoint" }));
-
-// ruteo sin validación de esquemas (ejemplos básicos)
-// authRouter.post('/sign-up', (req, res) => {
-//     res.send({ title: 'Sign-up endpoint' });
-// });
-
-// authRouter.post('/sign-in', (req, res) => {
-//     res.send({ title: 'Sign-in endpoint' });
-// });
-
-// authRouter.post('/sign-out', (req, res) => {
-//     res.send({ title: 'Sign-out endpoint' });
-// });
-
-// ruteo con validación de esquemas
-// authRouter.post("/login", validateSchema(loginSchema), login);
-// authRouter.post("/register", validateSchema(registerSchema), register);

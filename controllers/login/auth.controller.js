@@ -5,8 +5,7 @@ import Usuario from '../../models/usuarios/usuarios.model.js';
 import Matrizacceso from '../../models/matriz/matrizacceso.model.js';
 import { sequelize } from '../../database/mysql.js';
 import { JWT_EXPIRES_IN, JWT_SECRET, SMTP_HOST, SMTP_USER, SMTP_PASS } from '../../config/env.js';
-// import { JWT_EXPIRES_IN, JWT_SECRET } from '../../config/env.js';
-// import { Op } from "sequelize";
+import Municipios from "../../models/usuarios/municipios.model.js";
 
 // funcion para registro de usuarios
 export const registrar = async (req, res) => {
@@ -276,22 +275,109 @@ export const iniciar = async (req, res) => {
 
 
 export const abandonar = async (req, res) => {
+    try {
 
-    console.log("Saliste de la sesión");
-    res.send('Saliendo de la sesión');
+        console.log("Solicitud para cerrar sesión recibida.");
+
+        // --- 1. ELIMINAR COOKIE DE PRIMER ACCESO ---
+        // Esta cookie se crea en iniciar(), por lo tanto debe eliminarse al salir.
+        res.clearCookie("valor", {
+            httpOnly: true,
+            secure: false,   // true si está en producción con HTTPS
+            sameSite: "lax"
+        });
+
+        // --- 2. INVALIDAR SESIÓN ---
+        if (req.session) {
+
+            console.log("Sesión actual:", req.session);
+
+            // destruir la sesión
+            req.session.destroy((err) => {
+
+                if (err) {
+                    console.error("Error al destruir sesión:", err);
+                    return res.status(500).json({
+                        success: false,
+                        message: "No se pudo cerrar la sesión correctamente."
+                    });
+                }
+
+                // también eliminar cookie de la sesión generada por express-session
+                res.clearCookie("connect.sid", {
+                    httpOnly: true,
+                    secure: false,
+                    sameSite: "lax"
+                });
+
+                console.log("Sesión eliminada correctamente.");
+
+                return res.status(200).json({
+                    success: true,
+                    message: "Sesión cerrada correctamente."
+                });
+            });
+
+        } else {
+            // si no existía sesión igual devolvemos estado consistente
+            return res.status(200).json({
+                success: true,
+                message: "No había sesión activa, pero el cierre se procesó correctamente."
+            });
+        }
+
+    } catch (error) {
+        console.error("Error en abandonar():", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error interno al cerrar sesión."
+        });
+    }
+};
 
 
-    // try {
+// funcion para cargar datos en el formulario de registro
+export const obtenerMunicipiosPorEstado = async (req, res) => {
+    const t = await sequelize.transaction();
 
-    //     console.log('Sesion de: ', req.session)
-    //     // destruir la session
-    //     req.session.destroy((err) => {
-    //     if (err) {
-    //         return console.log(err);
-    //     }
-    //         res.send('Cerraste sesión');
-    //     });
-    // } catch (error) {
-    //     return next(error);
-    // }
-}
+    try {
+        const { id_estado } = req.params;
+
+        if (!id_estado) {
+            await t.rollback();
+            return res.status(400).json({
+                success: false,
+                message: "Debe proporcionar un id_estado"
+            });
+        }
+
+        // Buscar municipios dentro de una transacción
+        const municipios = await Municipios.findAll({
+            where: { id_estado },
+            attributes: ["num_municipio", "municipio"],
+            transaction: t
+        });
+
+        const total = municipios.length;
+
+        // Confirmar transacción
+        await t.commit();
+
+        return res.status(200).json({
+            success: true,
+            message: "Municipios encontrados",
+            total_registros: total,
+            municipios
+        });
+
+    } catch (error) {
+        console.error("Error al obtener municipios:", error);
+        await t.rollback();
+
+        return res.status(500).json({
+            success: false,
+            message: "Error interno al consultar municipios"
+        });
+    }
+};
+
