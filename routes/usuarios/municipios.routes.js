@@ -25,14 +25,14 @@ municipioRouter.post('/', autorizaAcceso, municipioPost);
 
 // path : /api/v1/municipios (PUT)
 // actualizar un municipio por id
-municipioRouter.put('/:id', municipioPut);
+municipioRouter.put('/:id', autorizaAcceso, municipioPut);
 
 // path : /api/v1/municipios (PATCH)
 // actualizar un municipio por id
-municipioRouter.patch('/:id', municipioPatch);
+municipioRouter.patch('/:id', autorizaAcceso, municipioPatch);
 
 // path : /api/v1/municipios (DELETE)
 // eliminar un municipio por id
-municipioRouter.delete('/:id', municipioDelete);
+municipioRouter.delete('/:id', autorizaAcceso, municipioDelete);
 
 export default municipioRouter;

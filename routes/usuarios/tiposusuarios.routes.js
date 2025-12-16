@@ -25,14 +25,14 @@ tiposusuarioRouter.post('/', autorizaAcceso, tipousuarioPost);
 
 // path : /api/v1/tiposusuarios (PUT)
 // actualizar un tipo de usuario por id
-tiposusuarioRouter.put('/:id', tipousuarioPut);
+tiposusuarioRouter.put('/:id', autorizaAcceso, tipousuarioPut);
 
 // path : /api/v1/tiposusuarios (PATCH)
 // actualizar un tipo de usuario por id
-tiposusuarioRouter.patch('/:id', tipousuarioPatch);
+tiposusuarioRouter.patch('/:id', autorizaAcceso, tipousuarioPatch);
 
 // path : /api/v1/tiposusuarios (DELETE)
 // eliminar un tipo de usuario por id
-tiposusuarioRouter.delete('/:id', tipousuarioDelete);
+tiposusuarioRouter.delete('/:id', autorizaAcceso, tipousuarioDelete);
 
 export default tiposusuarioRouter;
