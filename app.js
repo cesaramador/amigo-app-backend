@@ -36,6 +36,9 @@ import { corsMiddleware } from './middleware/corsmiddleware.js';
 // importar middleware de manejo de errores
 import { errorMiddleware } from "./middleware/error.middleware.js";
 
+// importar security middleware personalizado
+import securityMiddleware from "./middleware/security.middleware.js";
+
 // ********************************************************************************************
 // ********************************************************************************************
 // INICIALIZACIÓN DE EXPRESS
@@ -110,6 +113,19 @@ app.use(session({
         //maxAge: 1000 * 60 * 60 // 1 hora el resultado de la multiplicación es 3,600,000 milisegundos, que es igual a 1 hora.
         //maxAge: 1000 * 60 * 60 * 24 // 1 día
     }
+}));
+
+// ********************************************************************************************
+// ********************************************************************************************
+// INICIALIZACIÓN DE SECUTITY MIDDLEWARE
+
+// Debe ir ANTES de las rutas
+app.use(securityMiddleware({
+  mode: "reject",
+  whitelistParams: [
+    "nombre", "email", "telefono", "direccion",
+    "id_estado", "id_municipio"
+  ]
 }));
 
 
@@ -202,3 +218,7 @@ app.listen(PORT, async () => {
 
 export default app;
 
+// ********************************************************************************************
+// ******************************************************************************************** 
+
+// REVISADO 08 ENERO 2026

@@ -1,220 +1,146 @@
-// Middleware robusto para validación y sanitización de entradas (SQLi, XSS, Path Traversal, tamaño, profundidad, whitelist)
-// Opciones:
-//  - mode: 'reject' (por defecto) | 'sanitize'  -> 'reject' devuelve 400 ante entrada sospechosa, 'sanitize' intenta limpiar
-//  - maxStringLength, maxKeys, maxDepth, maxBodyBytes, whitelistParams (array), allowedContentTypes (array)
-//  - escapeHtmlOnSanitize: boolean (si mode === 'sanitize')
-// Uso: app.use(securityMiddleware(options));
+/**
+ * Security Middleware Enterprise
+ * Protección avanzada contra ataques en formularios y APIs públicas
+ * Compatible con Express + Sequelize
+ */
+
+// import crypto from "crypto";
+
 const DEFAULTS = {
-  mode: 'reject',
+  mode: "reject",
   maxStringLength: 1000,
-  maxKeys: 200,
-  maxDepth: 10,
-  maxBodyBytes: 1_000_000, // 1MB
+  maxKeys: 100,
+  maxDepth: 8,
+  maxBodyBytes: 1_000_000,
   whitelistParams: null,
-  allowedContentTypes: ['application/json', 'application/x-www-form-urlencoded', 'multipart/form-data'],
-  escapeHtmlOnSanitize: true
+  allowedContentTypes: [
+    "application/json",
+    "application/x-www-form-urlencoded",
+    "multipart/form-data"
+  ],
+  escapeHtmlOnSanitize: true,
+  maxRequestsPerMinute: 60   // 🆕 anti brute-force
 };
 
-// patrones sospechosos para SQLi / comandos peligrosos (mejor detectar múltiples patrones en combinación)
-const SQLI_PATTERNS = [
-  /\bunion\b\s+select\b/i,
-  /\bselect\b.+\bfrom\b/i,
-  /\binsert\b.+\binto\b/i,
-  /\bupdate\b.+\bset\b/i,
-  /\bdelete\b.+\bfrom\b/i,
-  /\bdrop\b\s+\btable\b/i,
-  /\btruncate\b/i,
-  /('|")\s*(or|and)\s+.+=+/i,     // "' OR 1=1" style
-  /--\s*$/i,                      // SQL comment at end
-  /;[\s]*$/i,                     // trailing semicolon
-  /\bexec\b\s+/i,
-  /\bdeclare\b\s+/i,
-  /\bsp_executesql\b/i,
-  /0x[0-9a-f]{2,}/i,             // hex payloads
-  /\bchar\(/i,
-  /\bconcat\(/i,
-  /\/\*.*\*\//i                   // block comments
+/* ------------------ PATRONES AVANZADOS ------------------ */
+
+const NOSQL_PATTERNS = [
+  /\$ne/i, /\$gt/i, /\$lt/i, /\$or/i, /\$and/i, /\$where/i
 ];
 
-// patrones XSS / javascript URIs
-const XSS_PATTERNS = [
-  /<script\b[^>]*>([\s\S]*?)<\/script>/i,
-  /javascript\s*:/i,
-  /\bon\w+\s*=\s*["'][^"']*["']/i, // onerror=, onclick= ...
-  /<img\b[^>]+>/i,
-  /<iframe\b/i,
-  /<svg\b/i
+const BOT_HEADERS = [
+  "sqlmap", "nikto", "nmap", "acunetix", "burp", "crawler"
 ];
 
-// path traversal
-const PATH_TRAVERSAL = [
-  /\.\.\/|\.\.\\/,
-  /%2e%2e%2f/i,
-  /%2e%2e%5c/i
-];
+/* ------------------ RATE LIMIT SIMPLE ------------------ */
 
-// control chars / null bytes
-const CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F]/;
+const rateStore = new Map();
 
-// helper para escapar HTML
-const escapeHtml = (str) =>
-  str.replace(/[&<>"'`=\/]/g, (s) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;'
-  }[s]));
+const isRateLimited = (ip, limit) => {
+  const now = Date.now();
+  const windowMs = 60_000;
 
-// detección combinada
-const containsPattern = (str, patterns) => {
-  if (typeof str !== 'string' || str.length === 0) return false;
-  for (const re of patterns) if (re.test(str)) return true;
-  return false;
+  if (!rateStore.has(ip)) {
+    rateStore.set(ip, { count: 1, time: now });
+    return false;
+  }
+
+  const data = rateStore.get(ip);
+  if (now - data.time > windowMs) {
+    rateStore.set(ip, { count: 1, time: now });
+    return false;
+  }
+
+  data.count++;
+  return data.count > limit;
 };
+
+/* ------------------ SANITIZACIÓN ------------------ */
 
 const sanitizeString = (str, opts) => {
-  let out = String(str).trim();
-  // eliminar control chars
-  out = out.replace(CONTROL_CHARS, '');
-  // opcionalmente escapar HTML para evitar XSS cuando mode === 'sanitize'
-  if (opts.mode === 'sanitize' && opts.escapeHtmlOnSanitize) out = escapeHtml(out);
-  // limitar longitud
+  let out = String(str).replace('/[\x00-\x1F]/g', "").trim();
   if (out.length > opts.maxStringLength) {
-    if (opts.mode === 'reject') throw new Error(`String demasiado largo (máx ${opts.maxStringLength})`);
+    if (opts.mode === "reject") throw new Error("Campo demasiado largo");
     out = out.slice(0, opts.maxStringLength);
   }
   return out;
 };
 
-const deepInspectAndSanitize = (value, opts, ctx = { depth: 0, keys: 0 }) => {
-  // depth control
-  if (ctx.depth > opts.maxDepth) throw new Error('Estructura demasiado profunda');
-  if (value == null) return value;
+const deepInspect = (obj, opts, depth = 0) => {
+  if (depth > opts.maxDepth) throw new Error("Estructura demasiado profunda");
 
-  const t = typeof value;
-  if (t === 'string') {
-    // check patterns
-    if (containsPattern(value, SQLI_PATTERNS)) {
-      if (opts.mode === 'reject') throw new Error('Entrada sospechosa (SQL Injection detectado)');
-      // sanitize by neutralizing quotes and keywords
-      let s = value.replace(/['"]/g, '');
-      s = s.replace(/\b(SELECT|INSERT|UPDATE|DELETE|UNION|DROP|TRUNCATE|DECLARE|EXEC)\b/ig, '');
-      s = sanitizeString(s, opts);
-      return s;
+  if (typeof obj === "string") {
+    if (NOSQL_PATTERNS.some(r => r.test(obj))) {
+      throw new Error("NoSQL Injection detectado");
     }
-    if (containsPattern(value, XSS_PATTERNS)) {
-      if (opts.mode === 'reject') throw new Error('Entrada sospechosa (XSS detectado)');
-      let s = value;
-      if (opts.escapeHtmlOnSanitize) s = escapeHtml(s);
-      s = sanitizeString(s, opts);
-      return s;
-    }
-    if (containsPattern(value, PATH_TRAVERSAL)) {
-      if (opts.mode === 'reject') throw new Error('Entrada sospechosa (Path Traversal detectado)');
-      // remove ../ sequences
-      return sanitizeString(value.replace(/\.\.(\/|\\)/g, ''), opts);
-    }
-    if (value.includes('\x00')) {
-      if (opts.mode === 'reject') throw new Error('Entrada inválida (NULL byte detectado)');
-      return sanitizeString(value.replace(/\x00/g, ''), opts);
-    }
-    // general sanitize
-    return sanitizeString(value, opts);
+    return sanitizeString(obj, opts);
   }
 
-  if (t === 'number' || t === 'boolean') {
-    if (Number.isFinite(value) || typeof value === 'boolean') return value;
-    throw new Error('Valor numérico inválido');
+  if (Array.isArray(obj)) {
+    return obj.map(v => deepInspect(v, opts, depth + 1));
   }
 
-  if (Array.isArray(value)) {
-    if (++ctx.depth > opts.maxDepth) throw new Error('Estructura de array demasiado profunda');
-    return value.map((v) => deepInspectAndSanitize(v, opts, { depth: ctx.depth, keys: ctx.keys }));
-  }
-
-  if (t === 'object') {
-    const out = {};
-    ctx.keys = ctx.keys || 0;
-    for (const k of Object.keys(value)) {
-      ctx.keys++;
-      if (ctx.keys > opts.maxKeys) throw new Error('Demasiadas claves en el objeto');
-      // disallow suspicious param names like '__proto__' or 'constructor'
-      if (/^(__proto__|constructor|prototype)$/.test(k)) throw new Error('Clave no permitida en el objeto');
-
-      // if whitelist provided, check here (only at top-level)
-      if (opts.whitelistParams && ctx.depth === 0) {
-        if (!opts.whitelistParams.includes(k)) {
-          throw new Error(`Parámetro no permitido: ${k}`);
-        }
+  if (typeof obj === "object" && obj !== null) {
+    const result = {};
+    for (const key of Object.keys(obj)) {
+      if (/^(__proto__|constructor|prototype)$/.test(key)) {
+        throw new Error("Clave peligrosa detectada");
       }
-
-      out[k] = deepInspectAndSanitize(value[k], opts, { depth: ctx.depth + 1, keys: ctx.keys });
+      if (opts.whitelistParams && depth === 0 && !opts.whitelistParams.includes(key)) {
+        throw new Error(`Campo no permitido: ${key}`);
+      }
+      result[key] = deepInspect(obj[key], opts, depth + 1);
     }
-    return out;
+    return result;
   }
 
-  // fallback: return as-is
-  return value;
+  return obj;
 };
+
+/* ------------------ MIDDLEWARE ------------------ */
 
 export default function securityMiddleware(userOptions = {}) {
   const opts = { ...DEFAULTS, ...userOptions };
 
   return (req, res, next) => {
     try {
-      // Content-Length / body size check
-      const contentLength = Number(req.headers['content-length'] || 0);
-      if (contentLength && contentLength > opts.maxBodyBytes) {
-        return res.status(413).json({ success: false, message: 'Payload demasiado grande' });
+      const ip = req.ip || req.connection.remoteAddress;
+
+      // 🛑 Rate limit
+      if (isRateLimited(ip, opts.maxRequestsPerMinute)) {
+        return res.status(429).json({
+          success: false,
+          message: "Demasiadas solicitudes. Intente más tarde."
+        });
       }
 
-      // Content-Type validation (si provisto y no multipart when not allowed)
-      if (req.headers['content-type'] && Array.isArray(opts.allowedContentTypes) && opts.allowedContentTypes.length) {
-        const contentType = String(req.headers['content-type']).split(';')[0].trim();
-        if (!opts.allowedContentTypes.includes(contentType)) {
-          return res.status(415).json({ success: false, message: `Content-Type no permitido: ${contentType}` });
-        }
+      // 🛑 Bots conocidos
+      const ua = (req.headers["user-agent"] || "").toLowerCase();
+      if (BOT_HEADERS.some(b => ua.includes(b))) {
+        return res.status(403).json({
+          success: false,
+          message: "Acceso denegado"
+        });
       }
 
-      // quick check: too many query params
-      const totalQueryKeys = Object.keys(req.query || {}).length;
-      if (totalQueryKeys > opts.maxKeys) {
-        return res.status(400).json({ success: false, message: 'Demasiados parámetros en query' });
+      // 🛑 Body size
+      const contentLength = Number(req.headers["content-length"] || 0);
+      if (contentLength > opts.maxBodyBytes) {
+        return res.status(413).json({ success: false, message: "Payload demasiado grande" });
       }
 
-      // sanitize params, query, body
-      if (req.params) {
-        req.params = deepInspectAndSanitize(req.params, opts);
-      }
-      if (req.query) {
-        req.query = deepInspectAndSanitize(req.query, opts);
-      }
-      if (req.body) {
-        // if raw body present as string (e.g., text), check patterns
-        req.body = deepInspectAndSanitize(req.body, opts);
-      }
+      // 🛑 Sanitizar inputs
+      req.params = deepInspect(req.params || {}, opts);
+      req.query = deepInspect(req.query || {}, opts);
+      req.body = deepInspect(req.body || {}, opts);
 
-      // Additional header checks: deny suspicious headers
-      const forbiddenHeaderPatterns = [/sql/i, /mysql/i, /oracle/i, /union/i, /select/i];
-      for (const h of Object.keys(req.headers || {})) {
-        if (forbiddenHeaderPatterns.some(re => re.test(h))) {
-          return res.status(400).json({ success: false, message: 'Header sospechoso detectado' });
-        }
-        const hv = String(req.headers[h] || '');
-        if (containsPattern(hv, SQLI_PATTERNS) || containsPattern(hv, XSS_PATTERNS)) {
-          return res.status(400).json({ success: false, message: 'Header con contenido sospechoso' });
-        }
-      }
-
-      // Basic rate-protection hint: if desired, user can provide a rateCheck function via options
-      if (typeof opts.rateCheck === 'function') {
-        const allowed = opts.rateCheck(req);
-        if (allowed === false) return res.status(429).json({ success: false, message: 'Too many requests' });
-      }
-
-      // All good
-      return next();
+      next();
     } catch (err) {
-      // If opts.mode === 'sanitize' some sanitizations may throw; convert to 400
-      console.warn('securityMiddleware blocked request:', err.message);
-      return res.status(400).json({ success: false, message: err.message || 'Entrada inválida' });
+      console.warn("🚨 Security middleware bloqueó petición:", err.message);
+      return res.status(400).json({
+        success: false,
+        message: err.message || "Solicitud bloqueada por seguridad"
+      });
     }
   };
 }
