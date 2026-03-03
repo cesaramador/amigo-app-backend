@@ -23,9 +23,16 @@ const PeriodosGrupos = sequelize.define('PeriodosGrupos', {
     id_responsable_grupo: {
         type: DataTypes.INTEGER,
         allowNull: false
+    },
+    hora_inicio: {
+        type: DataTypes.TIME,
+        allowNull: true
+    },
+    lugar_imparticion: {
+        type: DataTypes.STRING(250),
+        allowNull: true
     }
-},
-{
+}, {
     timestamps: false,
     tableName: 'PeriodosGrupos'
 });

@@ -51,7 +51,7 @@ const Usuarios = sequelize.define('Usuarios', {
     },
     codigo: {
         type: DataTypes.STRING,
-        length: 100,
+        length: 10,
         allowNull: false
     },
     id_estado: {
@@ -89,7 +89,7 @@ const Usuarios = sequelize.define('Usuarios', {
     },
     razon_social: {
         type: DataTypes.STRING,
-        length: 200,
+        length: 500,
         allowNull: true
     },
     rfc: {

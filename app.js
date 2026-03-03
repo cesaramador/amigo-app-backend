@@ -11,7 +11,6 @@ import authRouter from './routes/login/auth.routes.js';
 // importar rutas para usuarios
 import usuarioRouter from './routes/usuarios/usuarios.routes.js';
 import generoRouter from './routes/usuarios/generos.routes.js';
-import grupoRouter from './routes/grupos/grupos.routes.js';
 import estadoRouter from './routes/usuarios/estados.routes.js';
 import municipioRouter from './routes/usuarios/municipios.routes.js';
 import categoriasviviendaRouter from './routes/usuarios/categoriaviviendas.routes.js';
@@ -19,12 +18,18 @@ import estatusmaritalRouter from './routes/usuarios/estatusmaritales.routes.js';
 import estatususuarioRouter from './routes/usuarios/estatususuarios.routes.js';
 import tiposusuarioRouter from './routes/usuarios/tiposusuarios.routes.js';
 
+// importar rutas para encuestas
+import encuestaRouter from './routes/encuestas/encuestas.routes.js';
+
+// importar rutas para los grupos
+import grupoRouter from './routes/grupos/grupos.routes.js';
+
 // importar rutas para matriz de accesos
 import vistaRouter from './routes/matriz/vistas.routes.js';
 import matrizaccesorouter from './routes/matriz/matrizacceso.routes.js';
 
 // importar rutas para proveedores
-// import proveedorRouter from './routes/proveedores/proveedores.routes.js';
+import proveedorRouter from './routes/proveedores/proveedores.routes.js';
 
 import cookieParser from 'cookie-parser';
 import session from "express-session";
@@ -168,14 +173,14 @@ app.use('/api/v1/categoriasviviendas', categoriasviviendaRouter);
 // api principal para los tipos de usuarios
 app.use('/api/v1/tiposusuarios', tiposusuarioRouter);
 
-// api principal para las encuestas
-//app.use('/api/v1/encuestas', encuestaRouter);
-
 // api principal para los grupos
 app.use('/api/v1/grupos', grupoRouter);
 
+// api principal para las encuestas
+app.use('/api/v1/encuestas', encuestaRouter);
+
 // api principal para los proveedores
-//app.use('/api/v1/proveedores', proveedorRouter);
+app.use('/api/v1/proveedores', proveedorRouter);
 
 
 // ********************************************************************************************

@@ -133,7 +133,7 @@ CREATE TABLE MatrizAccesos
 );
 
 -- ***************************************************************************************************
--- CREAR TABLAS DE GRUPOS
+-- CREAR TABLAS DE GRUPOS (CURSOS)
 
 -- TABLA # 9
 CREATE TABLE TiposGrupos
@@ -175,7 +175,9 @@ CREATE TABLE PeriodosGrupos
     id_grupo int ,
     id_periodo int ,
     id_estatus_grupo int NOT  NULL ,
-    id_responsable_grupo int NOT NULL ,
+    id_responsable_grupo int NOT NULL,
+    hora_inicio time,
+    lugar_imparticion varchar(250),
     CONSTRAINT FK_Id_PeriodoGrupo FOREIGN KEY (id_grupo) 
 		REFERENCES Grupos (id_grupo) MATCH SIMPLE ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT FK_Id_PeriodoPeriodo FOREIGN KEY (id_periodo) 
@@ -196,6 +198,16 @@ CREATE TABLE InscripcionesGrupos
 		REFERENCES PeriodosGrupos (id_periodogrupo) MATCH SIMPLE ON UPDATE CASCADE ON DELETE RESTRICT,
 	CONSTRAINT FK_Id_IncripcionUsuario FOREIGN KEY (id_usuario_inscrito) 
 		REFERENCES Usuarios (id_usuario) MATCH SIMPLE ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+CREATE TABLE Asistencias 
+(
+	id_asistencia int AUTO_INCREMENT PRIMARY KEY NOT NULL,
+    id_inscripciongrupo int NOT NULL,
+    fecha date,
+    asistencia bool,    -- boolean = true/false     bool = 0/1
+    CONSTRAINT FK_Id_AsistenciaIncripcionGrupo FOREIGN KEY (id_inscripciongrupo) 
+		REFERENCES InscripcionesGrupos (id_inscripciongrupo) MATCH SIMPLE ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
 -- ***************************************************************************************************
@@ -273,9 +285,12 @@ CREATE TABLE UsuariosEncuestas
     -- la encuesta resuelta en su totalidad y enviada al INAPAM se considera como realizada y no se puede alterar ni eliminar
 	id_usuario_encuesta int AUTO_INCREMENT PRIMARY KEY NOT NULL,
     id_usuario int NOT NULL,
+    id_encuesta int NOT NULL,
     fecha_elaboracion_encuesta date,
-    CONSTRAINT FK_Id_UsuariosEncuestasUsuairos FOREIGN KEY (id_usuario) 
-		REFERENCES Usuarios (id_usuario) MATCH SIMPLE ON UPDATE CASCADE ON DELETE RESTRICT
+    CONSTRAINT FK_Id_UsuariosEncuestasUsuarios FOREIGN KEY (id_usuario) 
+		REFERENCES Usuarios (id_usuario) MATCH SIMPLE ON UPDATE CASCADE ON DELETE RESTRICT,
+	CONSTRAINT FK_Id_UsuariosEncuestasEncuestas FOREIGN KEY (id_encuesta) 
+		REFERENCES Encuestas (id_encuesta) MATCH SIMPLE ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
 -- TABLA # 22
@@ -288,7 +303,7 @@ CREATE TABLE DetalleUsuariosEncuestas
     id_detalle_usuario_encuesta int AUTO_INCREMENT PRIMARY KEY NOT NULL,
     id_usuario_encuesta int NOT NULL,
     id_encuesta_pregunta_respuesta int NOT NULL,
-    valor_seleccionado int NOT NULL,
+    -- valor_seleccionado int NOT NULL,
     CONSTRAINT FK_Id_UsuariosEncuestasDetalles FOREIGN KEY (id_usuario_encuesta) 
 		REFERENCES UsuariosEncuestas (id_usuario_encuesta) MATCH SIMPLE ON UPDATE CASCADE ON DELETE RESTRICT,
 	CONSTRAINT FK_Id_EncuestasPreguntasRespuestasDetalles FOREIGN KEY (id_encuesta_pregunta_respuesta) 
@@ -309,7 +324,8 @@ CREATE TABLE InterpretacionResultados
 	id_interpreta_resultado int AUTO_INCREMENT PRIMARY KEY NOT NULL,
     id_encuesta int NOT NULL,
     puntuacion int NOT NULL,
-    nombre_resultado varchar(500) NOT NULL,
+    gravedad varchar(100) NOT NULL,
+    acciones_propuestas varchar(500) NOT NULL,
     CONSTRAINT FK_Id_InterpretacionResultadoEncuesta FOREIGN KEY (id_encuesta) 
 		REFERENCES Encuestas (id_encuesta) MATCH SIMPLE ON UPDATE CASCADE ON DELETE RESTRICT
 );
@@ -423,7 +439,7 @@ CREATE INDEX Idx_Publicacion ON Publicaciones (id_publicacion, id_proveedorconse
 
 -- ***************************************************************************************************
 -- INSERTS
-
+/*
 USE amigo;
 SELECT * FROM generos;
 SELECT * FROM tiposusuarios;
@@ -584,3 +600,14 @@ USE amigo;
 insert into matrizaccesos (id_tipousuario, id_vista, estatus) values (1, 1, 1);
 insert into matrizaccesos (id_tipousuario, id_vista, estatus) values (1, 2, 1);
 insert into matrizaccesos (id_tipousuario, id_vista, estatus) values (1, 3, 1);
+
+
+
+SELECT VERSION();
+-- '10.4.32-MariaDB'
+
+SHOW VARIABLES LIKE '%version%';
+-- 'version', '10.4.32-MariaDB'
+
+*/
+

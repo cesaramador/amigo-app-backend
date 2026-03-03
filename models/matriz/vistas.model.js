@@ -11,7 +11,7 @@ const Vistas = sequelize.define('Vistas', {
     },
     vista: {
         type: DataTypes.STRING,
-        length: 20,
+        length: 50,
         allowNull: false
     }
 },

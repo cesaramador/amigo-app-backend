@@ -10,7 +10,7 @@ const Grupos = sequelize.define('Grupos', {
     },
     nombre_grupo: {
         type: DataTypes.STRING,
-        length: 100,
+        length: 200,
         allowNull: false
     },
     id_tipogrupo: {
