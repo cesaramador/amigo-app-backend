@@ -2,252 +2,358 @@ import Grupos from "../../models/grupos/grupos.model.js";
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
-// Obtener todas las categorías de vivienda
+// ─── Campos permitidos para ordenamiento ─────────────────────────────────────
+const ALLOWED_SORT_FIELDS = ['id_grupo', 'nombre_grupo', 'id_tipogrupo'];
+const DEFAULT_SORT_FIELD  = 'id_grupo';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /grupos  →  lista paginada con búsqueda y ordenamiento
+// ─────────────────────────────────────────────────────────────────────────────
 export const gruposGet = async (req, res, next) => {
     try {
-        // Paginación y límites seguros
-        const page = Math.max(1, Number(req.query.page) || 1);
-        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+        // Paginación segura
+        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
+        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
         const offset = (page - 1) * limit;
 
-        // Búsqueda por texto
+        // Filtros opcionales
+        const where = {};
+
+        // Búsqueda por texto en nombre_grupo
         const q = (req.query.q || '').trim();
-        const where = q ? { nombre_grupo: { [Op.like]: `%${q}%` } } : {};
+        if (q) where.nombre_grupo = { [Op.like]: `%${q}%` };
 
-        // Orden seguro
-        const [sortField = 'id_grupo', sortOrderRaw = 'asc'] = (req.query.sort || 'id_grupo:asc').split(':');
-        const allowedSortFields = ['id_grupo', 'nombre_grupo'];
-        const sortFieldSafe = allowedSortFields.includes(sortField) ? sortField : 'id_grupo';
-        const sortOrder = (String(sortOrderRaw).toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+        // Filtrar por tipo de grupo
+        if (req.query.id_tipogrupo !== undefined) {
+            const idTg = parseInt(req.query.id_tipogrupo, 10);
+            if (!Number.isInteger(idTg) || idTg <= 0) {
+                return res.status(400).json({ success: false, message: 'El parámetro id_tipogrupo debe ser un entero positivo' });
+            }
+            where.id_tipogrupo = idTg;
+        }
 
-        // Consulta dentro de transacción
-        const result = await sequelize.transaction(async (t) => {
-            return await Grupos.findAndCountAll({
-                where,
-                limit,
-                offset,
-                order: [[sortFieldSafe, sortOrder]],
-                transaction: t
-            });
+        // Ordenamiento seguro
+        const [sortField = DEFAULT_SORT_FIELD, sortOrderRaw = 'asc'] =
+            (req.query.sort || `${DEFAULT_SORT_FIELD}:asc`).split(':');
+        const sortFieldSafe = ALLOWED_SORT_FIELDS.includes(sortField) ? sortField : DEFAULT_SORT_FIELD;
+        const sortOrder     = sortOrderRaw.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+
+        // Consulta (lectura: sin transacción explícita)
+        const { count, rows } = await Grupos.findAndCountAll({
+            where,
+            limit,
+            offset,
+            order: [[sortFieldSafe, sortOrder]]
         });
 
-        const total = result.count;
+        const total = count;
         const pages = Math.ceil(total / limit) || 1;
 
         return res.status(200).json({
             success: true,
             meta: { total, page, pages, limit, sort: `${sortFieldSafe}:${sortOrder}` },
-            data: result.rows
+            data: rows
         });
     } catch (error) {
-        console.error('Error en gruposGet:', error.message || error);
+        console.error('[gruposGet]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Obtener una categoría de vivienda por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /grupos/:id  →  registro único por PK
+// ─────────────────────────────────────────────────────────────────────────────
 export const gruposGetById = async (req, res, next) => {
     try {
-        const id = Number(req.params.id);
+        const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        const categoria = await sequelize.transaction(async (t) => {
-            return await Grupos.findByPk(id, { transaction: t });
-        });
+        // Lectura simple: sin transacción explícita
+        const grupo = await Grupos.findByPk(id);
 
-        if (!categoria) {
+        if (!grupo) {
             return res.status(404).json({ success: false, message: 'Grupo no encontrado' });
         }
 
-        return res.status(200).json({ success: true, data: categoria });
+        return res.status(200).json({ success: true, data: grupo });
     } catch (error) {
-        console.error('Error en gruposGetById:', error.message || error);
+        console.error('[gruposGetById]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Crear una nueva categoría de vivienda
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /grupos  →  crear nuevo grupo
+// ─────────────────────────────────────────────────────────────────────────────
 export const grupoPost = async (req, res, next) => {
     try {
-        const { nombre_grupo } = req.body;
+        const { nombre_grupo, id_tipogrupo } = req.body;
 
-        // Validación básica
+        // Validar nombre_grupo (obligatorio)
         if (!nombre_grupo || typeof nombre_grupo !== 'string' || nombre_grupo.trim() === '') {
             return res.status(400).json({ success: false, message: 'El campo nombre_grupo es obligatorio' });
         }
-        const value = nombre_grupo.trim();
+        const nombreValue = nombre_grupo.trim();
 
-        // Longitud desde el modelo (si está definida)
-        const attrs = Grupos.rawAttributes || {};
-        const maxLength = attrs.nombre_grupo?.type?.options?.length ?? attrs.nombre_grupo?._length ?? 20;
-        if (value.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo nombre_grupo no puede exceder ${maxLength} caracteres` });
+        // Longitud máxima obtenida del modelo
+        const attrs     = Grupos.rawAttributes || {};
+        const maxLength = attrs.nombre_grupo?.type?.options?.length
+                       ?? attrs.nombre_grupo?._length
+                       ?? 200;
+        if (nombreValue.length > maxLength) {
+            return res.status(400).json({
+                success: false,
+                message: `El campo nombre_grupo no puede exceder ${maxLength} caracteres`
+            });
         }
 
-        // Verificar duplicado
-        const exists = await Grupos.findOne({ where: { nombre_grupo: value } });
+        // Validar id_tipogrupo (opcional, pero si se envía debe ser entero positivo)
+        let idTgValue = null;
+        if (id_tipogrupo !== undefined && id_tipogrupo !== null && id_tipogrupo !== '') {
+            idTgValue = parseInt(id_tipogrupo, 10);
+            if (!Number.isInteger(idTgValue) || idTgValue <= 0) {
+                return res.status(400).json({ success: false, message: 'El campo id_tipogrupo debe ser un entero positivo' });
+            }
+        }
+
+        // Verificar duplicado de nombre
+        const exists = await Grupos.findOne({ where: { nombre_grupo: nombreValue } });
         if (exists) {
-            return res.status(409).json({ success: false, message: 'El grupo ya existe' });
+            return res.status(409).json({ success: false, message: 'El nombre del grupo ya existe' });
         }
 
         // Crear dentro de transacción
         const nuevo = await sequelize.transaction(async (t) => {
-            return await Grupos.create({ nombre_grupo: value }, { transaction: t });
+            return await Grupos.create(
+                { nombre_grupo: nombreValue, id_tipogrupo: idTgValue },
+                { transaction: t }
+            );
         });
 
-        return res.status(201).json({ success: true, message: 'Grupo creado exitosamente', data: nuevo });
+        return res.status(201).json({
+            success: true,
+            message: 'Grupo creado exitosamente',
+            data: nuevo
+        });
     } catch (error) {
-        console.error('Error en grupoPost:', error.message || error);
+        console.error('[grupoPost]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Actualizar una categoría de vivienda por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /grupos/:id  →  reemplazo total del registro
+// ─────────────────────────────────────────────────────────────────────────────
 export const grupoPut = async (req, res, next) => {
     try {
-        const id = Number(req.params.id);
+        const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        const { nombre_grupo } = req.body;
+        const { nombre_grupo, id_tipogrupo } = req.body;
+
+        // Validar nombre_grupo (obligatorio en PUT)
         if (!nombre_grupo || typeof nombre_grupo !== 'string' || nombre_grupo.trim() === '') {
             return res.status(400).json({ success: false, message: 'El campo nombre_grupo es obligatorio' });
         }
-        const value = nombre_grupo.trim();
+        const nombreValue = nombre_grupo.trim();
 
-        // obtener longitud máxima desde el modelo
-        const attrs = Grupos.rawAttributes || {};
-        const maxLength = attrs.nombre_grupo?.type?.options?.length ?? attrs.nombre_grupo?._length ?? 20;
-        if (value.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo nombre_grupo no puede exceder ${maxLength} caracteres` });
+        // Longitud máxima obtenida del modelo
+        const attrs     = Grupos.rawAttributes || {};
+        const maxLength = attrs.nombre_grupo?.type?.options?.length
+                       ?? attrs.nombre_grupo?._length
+                       ?? 200;
+        if (nombreValue.length > maxLength) {
+            return res.status(400).json({
+                success: false,
+                message: `El campo nombre_grupo no puede exceder ${maxLength} caracteres`
+            });
         }
 
-        // Actualizar dentro de transacción
-        const updated = await sequelize.transaction(async (t) => {
-            const record = await Grupos.findByPk(id, { transaction: t });
-            if (!record) return null;
+        // Validar id_tipogrupo (opcional)
+        let idTgValue = null;
+        if (id_tipogrupo !== undefined && id_tipogrupo !== null && id_tipogrupo !== '') {
+            idTgValue = parseInt(id_tipogrupo, 10);
+            if (!Number.isInteger(idTgValue) || idTgValue <= 0) {
+                return res.status(400).json({ success: false, message: 'El campo id_tipogrupo debe ser un entero positivo' });
+            }
+        }
 
-            // comprobar duplicado (excluir el propio registro)
-            const exists = await Grupos.findOne({
-                where: { nombre_grupo: value, id_grupo: { [Op.ne]: id } },
+        const actualizado = await sequelize.transaction(async (t) => {
+            const registro = await Grupos.findByPk(id, { transaction: t });
+            if (!registro) return null;
+
+            // Verificar duplicado de nombre (excluir el propio registro)
+            const duplicado = await Grupos.findOne({
+                where: { nombre_grupo: nombreValue, id_grupo: { [Op.ne]: id } },
                 transaction: t
             });
-            if (exists) {
-                const err = new Error('El grupo ya existe');
+            if (duplicado) {
+                const err = new Error('El nombre del grupo ya existe');
                 err.statusCode = 409;
                 throw err;
             }
 
-            await record.update({ nombre_grupo: value }, { transaction: t });
+            await registro.update({ nombre_grupo: nombreValue, id_tipogrupo: idTgValue }, { transaction: t });
             return await Grupos.findByPk(id, { transaction: t });
         });
 
-        if (!updated) {
+        if (!actualizado) {
             return res.status(404).json({ success: false, message: 'Grupo no encontrado' });
         }
 
-        return res.status(200).json({ success: true, message: 'Grupo actualizado exitosamente', data: updated });
+        return res.status(200).json({
+            success: true,
+            message: 'Grupo actualizado exitosamente',
+            data: actualizado
+        });
     } catch (error) {
-        console.error('Error en grupoPut:', error.message || error);
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
+        }
+        console.error('[grupoPut]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Actualizar parcialmente una categoría de vivienda por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /grupos/:id  →  actualización parcial del registro
+// ─────────────────────────────────────────────────────────────────────────────
 export const grupoPatch = async (req, res, next) => {
     try {
-        const id = Number(req.params.id);
+        const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        const { nombre_grupo } = req.body;
-        if (typeof nombre_grupo === 'undefined' || nombre_grupo === null) {
-            return res.status(400).json({ success: false, message: 'Campo "nombre_grupo" requerido' });
-        }
-        if (typeof nombre_grupo !== 'string' || nombre_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Campo "nombre_grupo" inválido' });
-        }
+        const camposPermitidos = ['nombre_grupo', 'id_tipogrupo'];
+        const camposRecibidos  = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
 
-        const value = nombre_grupo.trim();
-        const attrs = Grupos.rawAttributes || {};
-        const maxLength = attrs.nombre_grupo?.type?.options?.length ?? attrs.nombre_grupo?._length ?? 20;
-        if (value.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo nombre_grupo no puede exceder ${maxLength} caracteres` });
+        if (camposRecibidos.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Se requiere al menos uno de los campos: ${camposPermitidos.join(', ')}`
+            });
         }
 
-        // Actualizar dentro de transacción
-        const updated = await sequelize.transaction(async (t) => {
-            const record = await Grupos.findByPk(id, { transaction: t });
-            if (!record) return null;
+        // Construir objeto de cambios validados
+        const cambios = {};
 
-            if (record.nombre_grupo !== value) {
-                const exists = await Grupos.findOne({
-                    where: { nombre_grupo: value, id_grupo: { [Op.ne]: id } },
+        if ('nombre_grupo' in req.body) {
+            const { nombre_grupo } = req.body;
+            if (typeof nombre_grupo !== 'string' || nombre_grupo.trim() === '') {
+                return res.status(400).json({ success: false, message: 'El campo nombre_grupo no es válido' });
+            }
+            const nombreValue = nombre_grupo.trim();
+
+            const attrs     = Grupos.rawAttributes || {};
+            const maxLength = attrs.nombre_grupo?.type?.options?.length
+                           ?? attrs.nombre_grupo?._length
+                           ?? 200;
+            if (nombreValue.length > maxLength) {
+                return res.status(400).json({
+                    success: false,
+                    message: `El campo nombre_grupo no puede exceder ${maxLength} caracteres`
+                });
+            }
+            cambios.nombre_grupo = nombreValue;
+        }
+
+        if ('id_tipogrupo' in req.body) {
+            const raw = req.body.id_tipogrupo;
+            if (raw === null || raw === '') {
+                cambios.id_tipogrupo = null; // permitir limpiar la FK
+            } else {
+                const idTgValue = parseInt(raw, 10);
+                if (!Number.isInteger(idTgValue) || idTgValue <= 0) {
+                    return res.status(400).json({ success: false, message: 'El campo id_tipogrupo debe ser un entero positivo o null' });
+                }
+                cambios.id_tipogrupo = idTgValue;
+            }
+        }
+
+        const actualizado = await sequelize.transaction(async (t) => {
+            const registro = await Grupos.findByPk(id, { transaction: t });
+            if (!registro) return null;
+
+            // Verificar duplicado de nombre solo si cambia
+            if ('nombre_grupo' in cambios && registro.nombre_grupo !== cambios.nombre_grupo) {
+                const duplicado = await Grupos.findOne({
+                    where: { nombre_grupo: cambios.nombre_grupo, id_grupo: { [Op.ne]: id } },
                     transaction: t
                 });
-                if (exists) {
-                    const err = new Error('El grupo ya existe');
+                if (duplicado) {
+                    const err = new Error('El nombre del grupo ya existe');
                     err.statusCode = 409;
                     throw err;
                 }
             }
 
-            await record.update({ nombre_grupo: value }, { transaction: t });
+            await registro.update(cambios, { transaction: t });
             return await Grupos.findByPk(id, { transaction: t });
         });
 
-        if (!updated) {
+        if (!actualizado) {
             return res.status(404).json({ success: false, message: 'Grupo no encontrado' });
         }
 
-        return res.status(200).json({ success: true, message: 'Grupo actualizado parcialmente', data: updated });
+        return res.status(200).json({
+            success: true,
+            message: 'Grupo actualizado parcialmente',
+            data: actualizado
+        });
     } catch (error) {
-        console.error('Error en grupoPatch:', error.message || error);
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
+        }
+        console.error('[grupoPatch]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Eliminar una categoría de vivienda por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /grupos/:id  →  eliminar registro por PK
+// ─────────────────────────────────────────────────────────────────────────────
 export const grupoDelete = async (req, res, next) => {
     try {
-        const id = Number(req.params.id);
+        const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        // Eliminar dentro de transacción
-        const deleted = await sequelize.transaction(async (t) => {
-            const record = await Grupos.findByPk(id, { transaction: t });
-            if (!record) return null;
+        const eliminado = await sequelize.transaction(async (t) => {
+            const registro = await Grupos.findByPk(id, { transaction: t });
+            if (!registro) return null;
 
-            const snapshot = record.get({ plain: true });
-            await record.destroy({ transaction: t });
+            const snapshot = registro.get({ plain: true });
+            await registro.destroy({ transaction: t });
             return snapshot;
         });
 
-        if (!deleted) {
+        if (!eliminado) {
             return res.status(404).json({ success: false, message: 'Grupo no encontrado' });
         }
 
         return res.status(200).json({
             success: true,
             message: 'Grupo eliminado correctamente',
-            data: deleted
+            data: eliminado
         });
     } catch (error) {
-        // Manejo específico de FK constraint
-        if (error.name === 'SequelizeForeignKeyConstraintError' || /foreign key|referenc/i.test(error.message || '')) {
+        // Integridad referencial
+        if (
+            error.name === 'SequelizeForeignKeyConstraintError' ||
+            /foreign key|referenc/i.test(error.message || '')
+        ) {
             return res.status(409).json({
                 success: false,
-                message: 'No se puede eliminar: existen referencias en otras tablas'
+                message: 'No se puede eliminar: el grupo está referenciado en otras tablas'
             });
         }
-        console.error('Error en grupoDelete:', error.message || error);
+        console.error('[grupoDelete]', error.message || error);
         return next(error);
     }
-}
-
+};

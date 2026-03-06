@@ -2,315 +2,495 @@ import PeriodosGrupos from "../../models/grupos/periodosgrupos.model.js";
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
-// Obtener todas los periodos con sus grupos
+// ─── Campos permitidos para ordenamiento ─────────────────────────────────────
+const ALLOWED_SORT_FIELDS = [
+    'id_periodogrupo', 'id_grupo', 'id_periodo',
+    'id_estatus_grupo', 'id_responsable_grupo', 'lugar_imparticion'
+];
+const DEFAULT_SORT_FIELD = 'id_periodogrupo';
+
+// ─── Helper: parsear entero positivo ─────────────────────────────────────────
+const parsePositiveInt = (value) => {
+    const n = parseInt(value, 10);
+    return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+// ─── Helper: validar formato de hora HH:MM o HH:MM:SS ────────────────────────
+const isValidTime = (value) => /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(value);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /periodosgrupos  →  lista paginada con filtros y ordenamiento
+// ─────────────────────────────────────────────────────────────────────────────
 export const periodosgruposGet = async (req, res, next) => {
     try {
-        // Paginación y límites seguros
-        const page = Math.max(1, Number(req.query.page) || 1);
-        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+        // Paginación segura
+        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
+        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
         const offset = (page - 1) * limit;
 
-        // Búsqueda por texto
-        // const q = (req.query.q || '').trim();
-        // const where = q ? { periodo: { [Op.like]: `%${q}%` } } : {};
+        // Filtros opcionales por clave foránea
+        const where = {};
+        const fkFilters = ['id_grupo', 'id_periodo', 'id_estatus_grupo', 'id_responsable_grupo'];
+        for (const field of fkFilters) {
+            if (req.query[field] !== undefined) {
+                const val = parsePositiveInt(req.query[field]);
+                if (val === null) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `El parámetro ${field} debe ser un entero positivo`
+                    });
+                }
+                where[field] = val;
+            }
+        }
 
-        // Orden seguro
-        const [sortField = 'id_periodogrupo', sortOrderRaw = 'asc'] = (req.query.sort || 'id_periodogrupo:asc').split(':');
-        const allowedSortFields = ['id_periodogrupo'];
-        const sortFieldSafe = allowedSortFields.includes(sortField) ? sortField : 'id_periodogrupo';
-        const sortOrder = (String(sortOrderRaw).toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+        // Filtro de texto en lugar_imparticion
+        const q = (req.query.q || '').trim();
+        if (q) where.lugar_imparticion = { [Op.like]: `%${q}%` };
 
-        // Consulta dentro de transacción
-        const result = await sequelize.transaction(async (t) => {
-            return await PeriodosGrupos.findAndCountAll({
-                //where,
-                limit,
-                offset,
-                order: [[sortFieldSafe, sortOrder]],
-                transaction: t
-            });
+        // Ordenamiento seguro
+        const [sortField = DEFAULT_SORT_FIELD, sortOrderRaw = 'asc'] =
+            (req.query.sort || `${DEFAULT_SORT_FIELD}:asc`).split(':');
+        const sortFieldSafe = ALLOWED_SORT_FIELDS.includes(sortField) ? sortField : DEFAULT_SORT_FIELD;
+        const sortOrder     = sortOrderRaw.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+
+        // Consulta (lectura: sin transacción explícita)
+        const { count, rows } = await PeriodosGrupos.findAndCountAll({
+            where,
+            limit,
+            offset,
+            order: [[sortFieldSafe, sortOrder]]
         });
 
-        const total = result.count;
+        const total = count;
         const pages = Math.ceil(total / limit) || 1;
 
         return res.status(200).json({
             success: true,
             meta: { total, page, pages, limit, sort: `${sortFieldSafe}:${sortOrder}` },
-            data: result.rows
+            data: rows
         });
     } catch (error) {
-        console.error('Error en periodosGet:', error.message || error);
+        console.error('[periodosgruposGet]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Obtener un periodo de un grupo por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /periodosgrupos/:id  →  registro único por PK
+// ─────────────────────────────────────────────────────────────────────────────
 export const periodogrupoGetById = async (req, res, next) => {
     try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+        const id = parsePositiveInt(req.params.id);
+        if (id === null) {
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        const periodogrupo = await sequelize.transaction(async (t) => {
-            return await PeriodosGrupos.findByPk(id, { transaction: t });
-        });
+        // Lectura simple: sin transacción explícita
+        const registro = await PeriodosGrupos.findByPk(id);
 
-        if (!periodogrupo) {
-            return res.status(404).json({ success: false, message: 'Periodo no encontrado' });
+        if (!registro) {
+            return res.status(404).json({ success: false, message: 'Periodo de grupo no encontrado' });
         }
 
-        return res.status(200).json({ success: true, data: periodogrupo });
+        return res.status(200).json({ success: true, data: registro });
     } catch (error) {
-        console.error('Error en periodogrupoGetById:', error.message || error);
+        console.error('[periodogrupoGetById]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Crear un periodo de un grupo
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /periodosgrupos  →  crear nuevo periodo de grupo
+// ─────────────────────────────────────────────────────────────────────────────
 export const periodogrupoPost = async (req, res, next) => {
     try {
-        const { id_grupo, id_periodo, id_estatus_grupo, id_responsable_grupo } = req.body;
+        const { id_grupo, id_periodo, id_estatus_grupo, id_responsable_grupo, hora_inicio, lugar_imparticion } = req.body;
 
-        // Validación básica
-        if (!id_grupo || !Number.isInteger(id_grupo) || id_grupo <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo id_grupo es obligatorio y debe ser un número entero positivo' });
+        // id_estatus_grupo y id_responsable_grupo: obligatorios (allowNull: false en el modelo)
+        const idEstatusGrupo    = parsePositiveInt(id_estatus_grupo);
+        const idResponsableGrupo = parsePositiveInt(id_responsable_grupo);
+
+        if (idEstatusGrupo === null) {
+            return res.status(400).json({ success: false, message: 'El campo id_estatus_grupo es obligatorio y debe ser un entero positivo' });
+        }
+        if (idResponsableGrupo === null) {
+            return res.status(400).json({ success: false, message: 'El campo id_responsable_grupo es obligatorio y debe ser un entero positivo' });
         }
 
-        if (!id_periodo || !Number.isInteger(id_periodo) || id_periodo <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo id_periodo es obligatorio y debe ser un número entero positivo' });
+        // id_grupo e id_periodo: opcionales (allowNull: true en el modelo)
+        let idGrupoVal = null, idPeriodoVal = null;
+        if (id_grupo !== undefined && id_grupo !== null && id_grupo !== '') {
+            idGrupoVal = parsePositiveInt(id_grupo);
+            if (idGrupoVal === null) {
+                return res.status(400).json({ success: false, message: 'El campo id_grupo debe ser un entero positivo' });
+            }
+        }
+        if (id_periodo !== undefined && id_periodo !== null && id_periodo !== '') {
+            idPeriodoVal = parsePositiveInt(id_periodo);
+            if (idPeriodoVal === null) {
+                return res.status(400).json({ success: false, message: 'El campo id_periodo debe ser un entero positivo' });
+            }
         }
 
-        if (!id_estatus_grupo || !Number.isInteger(id_estatus_grupo) || id_estatus_grupo <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo id_estatus_grupo es obligatorio y debe ser un número entero positivo' });
+        // hora_inicio: opcional — formato HH:MM o HH:MM:SS
+        let horaInicioVal = null;
+        if (hora_inicio !== undefined && hora_inicio !== null && hora_inicio !== '') {
+            if (!isValidTime(hora_inicio)) {
+                return res.status(400).json({ success: false, message: 'El campo hora_inicio debe tener formato HH:MM o HH:MM:SS' });
+            }
+            horaInicioVal = hora_inicio;
         }
 
-        if (!id_responsable_grupo || !Number.isInteger(id_responsable_grupo) || id_responsable_grupo <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo id_responsable_grupo es obligatorio y debe ser un número entero positivo' });
+        // lugar_imparticion: opcional — cadena máx. 250 caracteres
+        let lugarImparticionVal = null;
+        if (lugar_imparticion !== undefined && lugar_imparticion !== null && lugar_imparticion !== '') {
+            if (typeof lugar_imparticion !== 'string') {
+                return res.status(400).json({ success: false, message: 'El campo lugar_imparticion debe ser una cadena de texto' });
+            }
+            lugarImparticionVal = lugar_imparticion.trim();
+            if (lugarImparticionVal.length > 250) {
+                return res.status(400).json({ success: false, message: 'El campo lugar_imparticion no puede exceder 250 caracteres' });
+            }
         }
 
-        // validación de capctura de fechas de inicio y fin (opcional)
-        // if (fecha_inicio && isNaN(Date.parse(fecha_inicio))) {
-        //     return res.status(400).json({ success: false, message: 'El campo fecha_inicio debe ser una fecha válida' });
-        // }
-
-        // if (fecha_fin && isNaN(Date.parse(fecha_fin))) {
-        //     return res.status(400).json({ success: false, message: 'El campo fecha_fin debe ser una fecha válida' });
-        // }
-
-        // Longitud desde el modelo (si está definida)
-        // const attrs = PeriodosGrupos.rawAttributes || {};
-        // const maxLength = attrs.periodo?.type?.options?.length ?? attrs.periodo?._length ?? 20;
-        // if (periodo.length > maxLength) {
-        //     return res.status(400).json({ success: false, message: `El campo periodo no puede exceder ${maxLength} caracteres` });
-        // }
-
-        // Verificar duplicado
-        const exists_periodo = await PeriodosGrupos.findOne({ where: { id_grupo: id_grupo, 
-                                                                        id_periodo: id_periodo, 
-                                                                        id_estatus_grupo: id_estatus_grupo, 
-                                                                        id_responsable_grupo: id_responsable_grupo } });
-       
-        if (exists_periodo) {
-            return res.status(409).json({ success: false, message: 'El periodo ya existe' });
+        // Verificar duplicado de la combinación clave
+        const existe = await PeriodosGrupos.findOne({
+            where: {
+                id_grupo:             idGrupoVal,
+                id_periodo:           idPeriodoVal,
+                id_estatus_grupo:     idEstatusGrupo,
+                id_responsable_grupo: idResponsableGrupo
+            }
+        });
+        if (existe) {
+            return res.status(409).json({ success: false, message: 'Ya existe un periodo de grupo con los mismos datos' });
         }
 
         // Crear dentro de transacción
         const nuevo = await sequelize.transaction(async (t) => {
-            return await PeriodosGrupos.create({ id_grupo, id_periodo, id_estatus_grupo, id_responsable_grupo }, { transaction: t });
+            return await PeriodosGrupos.create(
+                {
+                    id_grupo:             idGrupoVal,
+                    id_periodo:           idPeriodoVal,
+                    id_estatus_grupo:     idEstatusGrupo,
+                    id_responsable_grupo: idResponsableGrupo,
+                    hora_inicio:          horaInicioVal,
+                    lugar_imparticion:    lugarImparticionVal
+                },
+                { transaction: t }
+            );
         });
 
-        return res.status(201).json({ success: true, message: 'Periodo creado exitosamente', data: nuevo });
+        return res.status(201).json({
+            success: true,
+            message: 'Periodo de grupo creado exitosamente',
+            data: nuevo
+        });
     } catch (error) {
-        console.error('Error en periodosPost:', error.message || error);
+        console.error('[periodogrupoPost]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Actualizar un periodo de grupo por ID (PUT - requiere todos los campos principales)
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /periodosgrupos/:id  →  reemplazo total del registro
+// ─────────────────────────────────────────────────────────────────────────────
 export const periodogrupoPut = async (req, res, next) => {
     try {
-        const { id_grupo, id_periodo, id_estatus_grupo, id_responsable_grupo } = req.body;
-
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+        const id = parsePositiveInt(req.params.id);
+        if (id === null) {
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        // Validaciones de campos obligatorios y tipos
-        if (!id_grupo || !Number.isInteger(id_grupo) || id_grupo <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo id_grupo es obligatorio y debe ser un entero positivo' });
-        }
-        if (!id_periodo || !Number.isInteger(id_periodo) || id_periodo <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo id_periodo es obligatorio y debe ser un entero positivo' });
-        }
-        if (!id_estatus_grupo || !Number.isInteger(id_estatus_grupo) || id_estatus_grupo <= 0) {
+        const { id_grupo, id_periodo, id_estatus_grupo, id_responsable_grupo, hora_inicio, lugar_imparticion } = req.body;
+
+        // Obligatorios en PUT
+        const idEstatusGrupo     = parsePositiveInt(id_estatus_grupo);
+        const idResponsableGrupo = parsePositiveInt(id_responsable_grupo);
+
+        if (idEstatusGrupo === null) {
             return res.status(400).json({ success: false, message: 'El campo id_estatus_grupo es obligatorio y debe ser un entero positivo' });
         }
-        if (!id_responsable_grupo || !Number.isInteger(id_responsable_grupo) || id_responsable_grupo <= 0) {
+        if (idResponsableGrupo === null) {
             return res.status(400).json({ success: false, message: 'El campo id_responsable_grupo es obligatorio y debe ser un entero positivo' });
         }
 
-        // Actualizar dentro de una transacción
-        const updated = await sequelize.transaction(async (t) => {
-            const record = await PeriodosGrupos.findByPk(id, { transaction: t });
-            if (!record) return null;
+        // Opcionales (nullables)
+        let idGrupoVal = null, idPeriodoVal = null;
+        if (id_grupo !== undefined && id_grupo !== null && id_grupo !== '') {
+            idGrupoVal = parsePositiveInt(id_grupo);
+            if (idGrupoVal === null) {
+                return res.status(400).json({ success: false, message: 'El campo id_grupo debe ser un entero positivo' });
+            }
+        }
+        if (id_periodo !== undefined && id_periodo !== null && id_periodo !== '') {
+            idPeriodoVal = parsePositiveInt(id_periodo);
+            if (idPeriodoVal === null) {
+                return res.status(400).json({ success: false, message: 'El campo id_periodo debe ser un entero positivo' });
+            }
+        }
 
-            // Verificar que la combinación no se duplique en otro registro distinto
-            const exists = await PeriodosGrupos.findOne({
+        // hora_inicio opcional
+        let horaInicioVal = null;
+        if (hora_inicio !== undefined && hora_inicio !== null && hora_inicio !== '') {
+            if (!isValidTime(hora_inicio)) {
+                return res.status(400).json({ success: false, message: 'El campo hora_inicio debe tener formato HH:MM o HH:MM:SS' });
+            }
+            horaInicioVal = hora_inicio;
+        }
+
+        // lugar_imparticion opcional
+        let lugarImparticionVal = null;
+        if (lugar_imparticion !== undefined && lugar_imparticion !== null && lugar_imparticion !== '') {
+            if (typeof lugar_imparticion !== 'string') {
+                return res.status(400).json({ success: false, message: 'El campo lugar_imparticion debe ser una cadena de texto' });
+            }
+            lugarImparticionVal = lugar_imparticion.trim();
+            if (lugarImparticionVal.length > 250) {
+                return res.status(400).json({ success: false, message: 'El campo lugar_imparticion no puede exceder 250 caracteres' });
+            }
+        }
+
+        const actualizado = await sequelize.transaction(async (t) => {
+            const registro = await PeriodosGrupos.findByPk(id, { transaction: t });
+            if (!registro) return null;
+
+            // Verificar duplicado de la combinación clave (excluyendo el propio registro)
+            const duplicado = await PeriodosGrupos.findOne({
                 where: {
-                    id_grupo,
-                    id_periodo,
-                    id_estatus_grupo,
-                    id_responsable_grupo,
-                    id_periodogrupo: { [Op.ne]: id }
+                    id_grupo:             idGrupoVal,
+                    id_periodo:           idPeriodoVal,
+                    id_estatus_grupo:     idEstatusGrupo,
+                    id_responsable_grupo: idResponsableGrupo,
+                    id_periodogrupo:      { [Op.ne]: id }
                 },
                 transaction: t
             });
-            if (exists) {
+            if (duplicado) {
                 const err = new Error('Ya existe un periodo de grupo con los mismos datos');
                 err.statusCode = 409;
                 throw err;
             }
 
-            await record.update({ id_grupo, id_periodo, id_estatus_grupo, id_responsable_grupo }, { transaction: t });
+            await registro.update(
+                {
+                    id_grupo:             idGrupoVal,
+                    id_periodo:           idPeriodoVal,
+                    id_estatus_grupo:     idEstatusGrupo,
+                    id_responsable_grupo: idResponsableGrupo,
+                    hora_inicio:          horaInicioVal,
+                    lugar_imparticion:    lugarImparticionVal
+                },
+                { transaction: t }
+            );
             return await PeriodosGrupos.findByPk(id, { transaction: t });
         });
 
-        if (!updated) {
+        if (!actualizado) {
             return res.status(404).json({ success: false, message: 'Periodo de grupo no encontrado' });
         }
 
-        return res.status(200).json({ success: true, message: 'Periodo de grupo actualizado exitosamente', data: updated });
+        return res.status(200).json({
+            success: true,
+            message: 'Periodo de grupo actualizado exitosamente',
+            data: actualizado
+        });
     } catch (error) {
-        console.error('Error en periodogrupoPut:', error.message || error);
-        if (error.statusCode) {
-            return res.status(error.statusCode).json({ success: false, message: error.message });
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
         }
+        console.error('[periodogrupoPut]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Actualizar parcialmente un periodo de grupo por ID (PATCH - campos opcionales)
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /periodosgrupos/:id  →  actualización parcial del registro
+// ─────────────────────────────────────────────────────────────────────────────
 export const periodogrupoPatch = async (req, res, next) => {
     try {
-        const { id_grupo, id_periodo, id_estatus_grupo, id_responsable_grupo } = req.body;
-
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+        const id = parsePositiveInt(req.params.id);
+        if (id === null) {
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        // Build update object with only valid fields
-        const updates = {};
-        if (id_grupo !== undefined) {
-            if (!Number.isInteger(id_grupo) || id_grupo <= 0) {
-                return res.status(400).json({ success: false, message: 'El campo id_grupo debe ser un entero positivo' });
+        const camposPermitidos = [
+            'id_grupo', 'id_periodo', 'id_estatus_grupo',
+            'id_responsable_grupo', 'hora_inicio', 'lugar_imparticion'
+        ];
+        const camposRecibidos = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
+
+        if (camposRecibidos.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Se requiere al menos uno de los campos: ${camposPermitidos.join(', ')}`
+            });
+        }
+
+        // Construir objeto de cambios validados
+        const cambios = {};
+
+        // Claves foráneas enteras: id_grupo e id_periodo son nullables
+        if ('id_grupo' in req.body) {
+            const raw = req.body.id_grupo;
+            if (raw === null || raw === '') {
+                cambios.id_grupo = null;
+            } else {
+                const val = parsePositiveInt(raw);
+                if (val === null) return res.status(400).json({ success: false, message: 'El campo id_grupo debe ser un entero positivo o null' });
+                cambios.id_grupo = val;
             }
-            updates.id_grupo = id_grupo;
         }
-        if (id_periodo !== undefined) {
-            if (!Number.isInteger(id_periodo) || id_periodo <= 0) {
-                return res.status(400).json({ success: false, message: 'El campo id_periodo debe ser un entero positivo' });
+        if ('id_periodo' in req.body) {
+            const raw = req.body.id_periodo;
+            if (raw === null || raw === '') {
+                cambios.id_periodo = null;
+            } else {
+                const val = parsePositiveInt(raw);
+                if (val === null) return res.status(400).json({ success: false, message: 'El campo id_periodo debe ser un entero positivo o null' });
+                cambios.id_periodo = val;
             }
-            updates.id_periodo = id_periodo;
         }
-        if (id_estatus_grupo !== undefined) {
-            if (!Number.isInteger(id_estatus_grupo) || id_estatus_grupo <= 0) {
-                return res.status(400).json({ success: false, message: 'El campo id_estatus_grupo debe ser un entero positivo' });
-            }
-            updates.id_estatus_grupo = id_estatus_grupo;
+        // Claves foráneas obligatorias (allowNull: false): si se envían, deben ser positivas
+        if ('id_estatus_grupo' in req.body) {
+            const val = parsePositiveInt(req.body.id_estatus_grupo);
+            if (val === null) return res.status(400).json({ success: false, message: 'El campo id_estatus_grupo debe ser un entero positivo' });
+            cambios.id_estatus_grupo = val;
         }
-        if (id_responsable_grupo !== undefined) {
-            if (!Number.isInteger(id_responsable_grupo) || id_responsable_grupo <= 0) {
-                return res.status(400).json({ success: false, message: 'El campo id_responsable_grupo debe ser un entero positivo' });
-            }
-            updates.id_responsable_grupo = id_responsable_grupo;
+        if ('id_responsable_grupo' in req.body) {
+            const val = parsePositiveInt(req.body.id_responsable_grupo);
+            if (val === null) return res.status(400).json({ success: false, message: 'El campo id_responsable_grupo debe ser un entero positivo' });
+            cambios.id_responsable_grupo = val;
         }
 
-        if (Object.keys(updates).length === 0) {
-            return res.status(400).json({ success: false, message: 'No se proporcionó ningún campo válido para actualizar' });
+        // hora_inicio: nullable, validar formato si se envía
+        if ('hora_inicio' in req.body) {
+            const raw = req.body.hora_inicio;
+            if (raw === null || raw === '') {
+                cambios.hora_inicio = null;
+            } else {
+                if (!isValidTime(raw)) {
+                    return res.status(400).json({ success: false, message: 'El campo hora_inicio debe tener formato HH:MM o HH:MM:SS' });
+                }
+                cambios.hora_inicio = raw;
+            }
         }
 
-        // Actualizar dentro de transacción
-        const updated = await sequelize.transaction(async (t) => {
-            const record = await PeriodosGrupos.findByPk(id, { transaction: t });
-            if (!record) return null;
+        // lugar_imparticion: nullable, validar longitud si se envía
+        if ('lugar_imparticion' in req.body) {
+            const raw = req.body.lugar_imparticion;
+            if (raw === null || raw === '') {
+                cambios.lugar_imparticion = null;
+            } else {
+                if (typeof raw !== 'string') {
+                    return res.status(400).json({ success: false, message: 'El campo lugar_imparticion debe ser una cadena de texto' });
+                }
+                const trimmed = raw.trim();
+                if (trimmed.length > 250) {
+                    return res.status(400).json({ success: false, message: 'El campo lugar_imparticion no puede exceder 250 caracteres' });
+                }
+                cambios.lugar_imparticion = trimmed;
+            }
+        }
 
-            // Si se cambian todos los campos principales, verificar duplicado
-            const dupCheckFields = ['id_grupo', 'id_periodo', 'id_estatus_grupo', 'id_responsable_grupo'];
-            if (dupCheckFields.every(f => updates[f] !== undefined)) {
-                const exists = await PeriodosGrupos.findOne({
+        const actualizado = await sequelize.transaction(async (t) => {
+            const registro = await PeriodosGrupos.findByPk(id, { transaction: t });
+            if (!registro) return null;
+
+            // Resolver valores finales de la clave compuesta para el check de duplicado
+            const idGrupoFinal    = 'id_grupo'             in cambios ? cambios.id_grupo             : registro.id_grupo;
+            const idPeriodoFinal  = 'id_periodo'           in cambios ? cambios.id_periodo           : registro.id_periodo;
+            const idEstatusFinal  = 'id_estatus_grupo'     in cambios ? cambios.id_estatus_grupo     : registro.id_estatus_grupo;
+            const idRespFinal     = 'id_responsable_grupo' in cambios ? cambios.id_responsable_grupo : registro.id_responsable_grupo;
+
+            // Siempre verificar duplicado de clave compuesta si alguno de sus campos cambió
+            const cambiaClaveCompuesta =
+                'id_grupo'             in cambios ||
+                'id_periodo'           in cambios ||
+                'id_estatus_grupo'     in cambios ||
+                'id_responsable_grupo' in cambios;
+
+            if (cambiaClaveCompuesta) {
+                const duplicado = await PeriodosGrupos.findOne({
                     where: {
-                        ...updates,
-                        id_periodogrupo: { [Op.ne]: id }
+                        id_grupo:             idGrupoFinal,
+                        id_periodo:           idPeriodoFinal,
+                        id_estatus_grupo:     idEstatusFinal,
+                        id_responsable_grupo: idRespFinal,
+                        id_periodogrupo:      { [Op.ne]: id }
                     },
                     transaction: t
                 });
-                if (exists) {
+                if (duplicado) {
                     const err = new Error('Ya existe un periodo de grupo con los mismos datos');
                     err.statusCode = 409;
                     throw err;
                 }
             }
 
-            await record.update(updates, { transaction: t });
+            await registro.update(cambios, { transaction: t });
             return await PeriodosGrupos.findByPk(id, { transaction: t });
         });
 
-        if (!updated) {
+        if (!actualizado) {
             return res.status(404).json({ success: false, message: 'Periodo de grupo no encontrado' });
         }
 
-        return res.status(200).json({ success: true, message: 'Periodo de grupo actualizado exitosamente', data: updated });
+        return res.status(200).json({
+            success: true,
+            message: 'Periodo de grupo actualizado parcialmente',
+            data: actualizado
+        });
     } catch (error) {
-        console.error('Error en periodogrupoPatch:', error.message || error);
         if (error.statusCode) {
             return res.status(error.statusCode).json({ success: false, message: error.message });
         }
+        console.error('[periodogrupoPatch]', error.message || error);
         return next(error);
     }
-}
+};
 
-
-// Eliminar un periodo de grupo por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /periodosgrupos/:id  →  eliminar registro por PK
+// ─────────────────────────────────────────────────────────────────────────────
 export const periodogrupoDelete = async (req, res, next) => {
     try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+        const id = parsePositiveInt(req.params.id);
+        if (id === null) {
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        // Eliminar dentro de transacción
-        const deleted = await sequelize.transaction(async (t) => {
-            const record = await PeriodosGrupos.findByPk(id, { transaction: t });
-            if (!record) return null;
+        const eliminado = await sequelize.transaction(async (t) => {
+            const registro = await PeriodosGrupos.findByPk(id, { transaction: t });
+            if (!registro) return null;
 
-            const snapshot = record.get({ plain: true });
-            await record.destroy({ transaction: t });
+            const snapshot = registro.get({ plain: true });
+            await registro.destroy({ transaction: t });
             return snapshot;
         });
 
-        if (!deleted) {
+        if (!eliminado) {
             return res.status(404).json({ success: false, message: 'Periodo de grupo no encontrado' });
         }
 
         return res.status(200).json({
             success: true,
             message: 'Periodo de grupo eliminado correctamente',
-            data: deleted
+            data: eliminado
         });
     } catch (error) {
-        // Manejo específico de FK constraint
-        if (error.name === 'SequelizeForeignKeyConstraintError' || /foreign key|referenc/i.test(error.message || '')) {
+        // Integridad referencial
+        if (
+            error.name === 'SequelizeForeignKeyConstraintError' ||
+            /foreign key|referenc/i.test(error.message || '')
+        ) {
             return res.status(409).json({
                 success: false,
-                message: 'No se puede eliminar: existen referencias en otras tablas'
+                message: 'No se puede eliminar: el periodo de grupo está referenciado en otras tablas'
             });
         }
-        console.error('Error en periodogrupoDelete:', error.message || error);
+        console.error('[periodogrupoDelete]', error.message || error);
         return next(error);
     }
-}
-
+};

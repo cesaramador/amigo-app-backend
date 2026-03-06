@@ -55,7 +55,6 @@ export const vistaGetById = async (req, res, next) => {
 
 
 // Crear una nueva vista
-// Crear una nueva vista
 export const vistaPost = async (req, res, next) => {
     let transaction;
     

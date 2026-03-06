@@ -1,37 +1,38 @@
 import { Router } from 'express';
+import {
+    gruposGet,
+    grupoGetById,
+    grupoPost,
+    grupoPut,
+    grupoPatch,
+    grupoDelete
+} from '../../controllers/grupos/grupos.controller.js';
+import autorizaAcceso from '../../middleware/auth.middleware.js';
 
-const grupoRouter = Router();
+const gruposRouter = Router();
 
-grupoRouter.get('/', (req, res) => {
-    res.send({ title: 'GET all groups' });
-}   );
+// path : /api/v1/grupos (GET)
+// leer todos los grupos
+gruposRouter.get('/', autorizaAcceso, gruposGet);
 
-grupoRouter.get('/:id', (req, res) => {
-    res.send({ title: 'GET group details endpoint' });
-});
+// path : /api/v1/grupos/:id (GET)
+// leer un grupo por id
+gruposRouter.get('/:id', autorizaAcceso, grupoGetById);
 
-grupoRouter.post('/', (req, res) => {
-    res.send({ title: 'CREATE new group endpoint' });
-});
+// path : /api/v1/grupos (POST)
+// crear un nuevo grupo
+gruposRouter.post('/', autorizaAcceso, grupoPost);
 
-grupoRouter.put('/:id', (req, res) => {
-    res.send({ title: 'UPDATE group endpoint' });
-});
+// path : /api/v1/grupos/:id (PUT)
+// actualizar un grupo por id
+gruposRouter.put('/:id', autorizaAcceso, grupoPut);
 
-grupoRouter.delete('/:id', (req, res) => {
-    res.send({ title: 'DELETE group endpoint' });
-});
+// path : /api/v1/grupos/:id (PATCH)
+// actualizar parcialmente un grupo por id
+gruposRouter.patch('/:id', autorizaAcceso, grupoPatch);
 
-grupoRouter.get('/user/:id', (req, res) => {
-    res.send({ title: 'GET group by id endpoint' });
-});
+// path : /api/v1/grupos/:id (DELETE)
+// eliminar un grupo por id
+gruposRouter.delete('/:id', autorizaAcceso, grupoDelete);
 
-grupoRouter.put('/:id/cancel', (req, res) => {
-    res.send({ title: 'CANCEL group endpoint' });
-});
-
-grupoRouter.get('/upcoming-renewals', (req, res) => {
-    res.send({ title: 'GET all upcoming renewals group endpoint' });
-});
-
-export default grupoRouter;
+export default gruposRouter;

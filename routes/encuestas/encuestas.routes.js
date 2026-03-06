@@ -1,37 +1,38 @@
 import { Router } from 'express';
+import {
+    encuestasGet,
+    encuestaGetById,
+    encuestaPost,
+    encuestaPut,
+    encuestaPatch,
+    encuestaDelete
+} from '../../controllers/encuestas/encuestas.controller.js';
+import autorizaAcceso from '../../middleware/auth.middleware.js';
 
-const encuestaRouter = Router();
+const encuestasRouter = Router();
 
-encuestaRouter.get('/', (req, res) => {
-    res.send({ title: 'GET all encuestas' });
-}   );
+// path : /api/v1/encuestas (GET)
+// leer todas las encuestas
+encuestasRouter.get('/', autorizaAcceso, encuestasGet);
 
-encuestaRouter.get('/:id', (req, res) => {
-    res.send({ title: 'GET encuesta details endpoint' });
-});
+// path : /api/v1/encuestas/:id (GET)
+// leer una encuesta por id
+encuestasRouter.get('/:id', autorizaAcceso, encuestaGetById);
 
-encuestaRouter.post('/', (req, res) => {
-    res.send({ title: 'CREATE new encuesta endpoint' });
-});
+// path : /api/v1/encuestas (POST)
+// crear una nueva encuesta
+encuestasRouter.post('/', autorizaAcceso, encuestaPost);
 
-encuestaRouter.put('/:id', (req, res) => {
-    res.send({ title: 'UPDATE encuesta endpoint' });
-});
+// path : /api/v1/encuestas/:id (PUT)
+// actualizar una encuesta por id
+encuestasRouter.put('/:id', autorizaAcceso, encuestaPut);
 
-encuestaRouter.delete('/:id', (req, res) => {
-    res.send({ title: 'DELETE encuesta endpoint' });
-});
+// path : /api/v1/encuestas/:id (PATCH)
+// actualizar parcialmente una encuesta por id
+encuestasRouter.patch('/:id', autorizaAcceso, encuestaPatch);
 
-encuestaRouter.get('/user/:id', (req, res) => {
-    res.send({ title: 'GET encuesta by id endpoint' });
-});
+// path : /api/v1/encuestas/:id (DELETE)
+// eliminar una encuesta por id
+encuestasRouter.delete('/:id', autorizaAcceso, encuestaDelete);
 
-encuestaRouter.put('/:id/cancel', (req, res) => {
-    res.send({ title: 'CANCEL encuesta endpoint' });
-});
-
-encuestaRouter.get('/upcoming-renewals', (req, res) => {
-    res.send({ title: 'GET all upcoming renewals encuesta endpoint' });
-});
-
-export default encuestaRouter;
+export default encuestasRouter;

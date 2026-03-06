@@ -2,266 +2,338 @@ import InscripcionesGrupos from "../../models/grupos/inscripcionesgrupos.model.j
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
-// Obtener todas las inscripciones de los grupos
+// ─── Campos permitidos para ordenamiento ─────────────────────────────────────
+const ALLOWED_SORT_FIELDS = ['id_inscripciongrupo', 'id_periodo_grupo', 'id_usuario_inscrito'];
+const DEFAULT_SORT_FIELD  = 'id_inscripciongrupo';
+
+// ─── Helper: validar entero positivo ─────────────────────────────────────────
+const parsePositiveInt = (value) => {
+    const n = parseInt(value, 10);
+    return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /inscripcionesgrupos  →  lista paginada con filtros y ordenamiento
+// ─────────────────────────────────────────────────────────────────────────────
 export const inscripcionesgruposGet = async (req, res, next) => {
     try {
-        // Paginación y límites seguros
-        const page = Math.max(1, Number(req.query.page) || 1);
-        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+        // Paginación segura
+        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
+        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
         const offset = (page - 1) * limit;
 
-        // Búsqueda por texto
-        // const q = (req.query.q || '').trim();
-        // const where = q ? { nombre_inscripcion: { [Op.like]: `%${q}%` } } : {};
+        // Filtros opcionales
+        const where = {};
 
-        // Orden seguro
-        const [sortField = 'id_inscripciongrupo', sortOrderRaw = 'asc'] = (req.query.sort || 'id_inscripciongrupo:asc').split(':');
-        const allowedSortFields = ['id_inscripciongrupo'];
-        const sortFieldSafe = allowedSortFields.includes(sortField) ? sortField : 'id_inscripciongrupo';
-        const sortOrder = (String(sortOrderRaw).toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+        if (req.query.id_periodo_grupo !== undefined) {
+            const val = parsePositiveInt(req.query.id_periodo_grupo);
+            if (val === null) {
+                return res.status(400).json({ success: false, message: 'El parámetro id_periodo_grupo debe ser un entero positivo' });
+            }
+            where.id_periodo_grupo = val;
+        }
 
-        // Consulta dentro de transacción
-        const result = await sequelize.transaction(async (t) => {
-            return await InscripcionesGrupos.findAndCountAll({
-                // where,
-                limit,
-                offset,
-                order: [[sortFieldSafe, sortOrder]],
-                transaction: t
-            });
+        if (req.query.id_usuario_inscrito !== undefined) {
+            const val = parsePositiveInt(req.query.id_usuario_inscrito);
+            if (val === null) {
+                return res.status(400).json({ success: false, message: 'El parámetro id_usuario_inscrito debe ser un entero positivo' });
+            }
+            where.id_usuario_inscrito = val;
+        }
+
+        // Ordenamiento seguro
+        const [sortField = DEFAULT_SORT_FIELD, sortOrderRaw = 'asc'] =
+            (req.query.sort || `${DEFAULT_SORT_FIELD}:asc`).split(':');
+        const sortFieldSafe = ALLOWED_SORT_FIELDS.includes(sortField) ? sortField : DEFAULT_SORT_FIELD;
+        const sortOrder     = sortOrderRaw.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+
+        // Consulta (lectura: sin transacción explícita)
+        const { count, rows } = await InscripcionesGrupos.findAndCountAll({
+            where,
+            limit,
+            offset,
+            order: [[sortFieldSafe, sortOrder]]
         });
 
-        const total = result.count;
+        const total = count;
         const pages = Math.ceil(total / limit) || 1;
 
         return res.status(200).json({
             success: true,
             meta: { total, page, pages, limit, sort: `${sortFieldSafe}:${sortOrder}` },
-            data: result.rows
+            data: rows
         });
     } catch (error) {
-        console.error('Error en inscripcionesgruposGet:', error.message || error);
+        console.error('[inscripcionesgruposGet]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Obtener una inscripción de grupo por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /inscripcionesgrupos/:id  →  registro único por PK
+// ─────────────────────────────────────────────────────────────────────────────
 export const inscripcionesgruposGetById = async (req, res, next) => {
     try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+        const id = parsePositiveInt(req.params.id);
+        if (id === null) {
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        const categoria = await sequelize.transaction(async (t) => {
-            return await InscripcionesGrupos.findByPk(id, { transaction: t });
-        });
+        // Lectura simple: sin transacción explícita
+        const registro = await InscripcionesGrupos.findByPk(id);
 
-        if (!categoria) {
+        if (!registro) {
             return res.status(404).json({ success: false, message: 'Inscripción de grupo no encontrada' });
         }
 
-        return res.status(200).json({ success: true, data: categoria });
+        return res.status(200).json({ success: true, data: registro });
     } catch (error) {
-        console.error('Error en inscripcionesgruposGetById:', error.message || error);
+        console.error('[inscripcionesgruposGetById]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Crear una nueva inscripción de grupo
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /inscripcionesgrupos  →  crear nueva inscripción
+// ─────────────────────────────────────────────────────────────────────────────
 export const inscripcionesgruposPost = async (req, res, next) => {
     try {
         const { id_periodo_grupo, id_usuario_inscrito } = req.body;
 
-        // Validación básica
-        if (!id_periodo_grupo || !id_usuario_inscrito) {
-            return res.status(400).json({ success: false, message: 'Los campos id_periodo_grupo e id_usuario_inscrito son obligatorios' });
+        // Validar que ambos campos sean enteros positivos
+        const idPeriodo  = parsePositiveInt(id_periodo_grupo);
+        const idUsuario  = parsePositiveInt(id_usuario_inscrito);
+
+        if (idPeriodo === null) {
+            return res.status(400).json({ success: false, message: 'El campo id_periodo_grupo es obligatorio y debe ser un entero positivo' });
         }
-        // const value = estatus_grupo.trim();
+        if (idUsuario === null) {
+            return res.status(400).json({ success: false, message: 'El campo id_usuario_inscrito es obligatorio y debe ser un entero positivo' });
+        }
 
-        // Longitud desde el modelo (si está definida)
-        // const attrs = CategoriasViviendas.rawAttributes || {};
-        // const maxLength = attrs.estatus_grupo?.type?.options?.length ?? attrs.estatus_grupo?._length ?? 20;
-        // if (value.length > maxLength) {
-        //     return res.status(400).json({ success: false, message: `El campo estatus_grupo no puede exceder ${maxLength} caracteres` });
-        // }
-
-        // Verificar duplicado
-        const exists_periodo = await InscripcionesGrupos.findOne({ where: { id_periodo_grupo: id_periodo_grupo } });
-        const exists_usuario = await InscripcionesGrupos.findOne({ where: { id_usuario_inscrito: id_usuario_inscrito } });
-        
-        if (exists_periodo && exists_usuario) {
+        // Verificar duplicado: la combinación (id_periodo_grupo + id_usuario_inscrito) debe ser única
+        const existe = await InscripcionesGrupos.findOne({
+            where: { id_periodo_grupo: idPeriodo, id_usuario_inscrito: idUsuario }
+        });
+        if (existe) {
             return res.status(409).json({ success: false, message: 'El usuario ya está inscrito en este periodo de grupo' });
         }
 
         // Crear dentro de transacción
         const nuevo = await sequelize.transaction(async (t) => {
-            return await InscripcionesGrupos.create({ id_periodo_grupo, id_usuario_inscrito }, { transaction: t });
+            return await InscripcionesGrupos.create(
+                { id_periodo_grupo: idPeriodo, id_usuario_inscrito: idUsuario },
+                { transaction: t }
+            );
         });
 
-        return res.status(201).json({ success: true, message: 'Inscripción de grupo creada exitosamente', data: nuevo });
+        return res.status(201).json({
+            success: true,
+            message: 'Inscripción de grupo creada exitosamente',
+            data: nuevo
+        });
     } catch (error) {
-        console.error('Error en inscripcionesgruposPost:', error.message || error);
+        console.error('[inscripcionesgruposPost]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Actualizar una inscripción de grupo por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /inscripcionesgrupos/:id  →  reemplazo total del registro
+// ─────────────────────────────────────────────────────────────────────────────
 export const inscripciongrupoPut = async (req, res, next) => {
     try {
+        const id = parsePositiveInt(req.params.id);
+        if (id === null) {
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
+        }
 
         const { id_periodo_grupo, id_usuario_inscrito } = req.body;
 
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+        // Validar campos obligatorios
+        const idPeriodo = parsePositiveInt(id_periodo_grupo);
+        const idUsuario = parsePositiveInt(id_usuario_inscrito);
+
+        if (idPeriodo === null) {
+            return res.status(400).json({ success: false, message: 'El campo id_periodo_grupo es obligatorio y debe ser un entero positivo' });
+        }
+        if (idUsuario === null) {
+            return res.status(400).json({ success: false, message: 'El campo id_usuario_inscrito es obligatorio y debe ser un entero positivo' });
         }
 
-        // const { estatus_grupo } = req.body;
-        // if (!estatus_grupo || typeof estatus_grupo !== 'string' || estatus_grupo.trim() === '') {
-        //     return res.status(400).json({ success: false, message: 'El campo estatus_grupo es obligatorio' });
-        // }
-        // const value = estatus_grupo.trim();
+        const actualizado = await sequelize.transaction(async (t) => {
+            const registro = await InscripcionesGrupos.findByPk(id, { transaction: t });
+            if (!registro) return null;
 
-        // obtener longitud máxima desde el modelo
-        // const attrs = CategoriasViviendas.rawAttributes || {};
-        // const maxLength = attrs.estatus_grupo?.type?.options?.length ?? attrs.estatus_grupo?._length ?? 20;
-        // if (value.length > maxLength) {
-        //     return res.status(400).json({ success: false, message: `El campo estatus_grupo no puede exceder ${maxLength} caracteres` });
-        // }
+            // Verificar duplicado de la combinación (excluir el propio registro)
+            const duplicado = await InscripcionesGrupos.findOne({
+                where: {
+                    id_periodo_grupo: idPeriodo,
+                    id_usuario_inscrito: idUsuario,
+                    id_inscripciongrupo: { [Op.ne]: id }
+                },
+                transaction: t
+            });
+            if (duplicado) {
+                const err = new Error('El usuario ya está inscrito en este periodo de grupo');
+                err.statusCode = 409;
+                throw err;
+            }
 
-        // Actualizar dentro de transacción
-        const updated = await sequelize.transaction(async (t) => {
-            const record = await InscripcionesGrupos.findByPk(id, { transaction: t });
-            if (!record) return null;
-
-            // comprobar duplicado (excluir el propio registro)
-            const exists_periodo = await InscripcionesGrupos.findOne({ where: { id_periodo_grupo: id_periodo_grupo } });
-            const exists_usuario = await InscripcionesGrupos.findOne({ where: { id_usuario_inscrito: id_usuario_inscrito } });
-        
-        if (exists_periodo && exists_usuario) {
-            return res.status(409).json({ success: false, message: 'El usuario ya está inscrito en este periodo de grupo' });
-        }
-
-            await record.update({ id_periodo_grupo, id_usuario_inscrito }, { transaction: t });
+            await registro.update({ id_periodo_grupo: idPeriodo, id_usuario_inscrito: idUsuario }, { transaction: t });
             return await InscripcionesGrupos.findByPk(id, { transaction: t });
         });
 
-        if (!updated) {
+        if (!actualizado) {
             return res.status(404).json({ success: false, message: 'Inscripción de grupo no encontrada' });
         }
 
-        return res.status(200).json({ success: true, message: 'Inscripción de grupo actualizada exitosamente', data: updated });
+        return res.status(200).json({
+            success: true,
+            message: 'Inscripción de grupo actualizada exitosamente',
+            data: actualizado
+        });
     } catch (error) {
-        console.error('Error en inscripciongrupoPut:', error.message || error);
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
+        }
+        console.error('[inscripciongrupoPut]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Actualizar parcialmente una inscripción de grupo por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /inscripcionesgrupos/:id  →  actualización parcial del registro
+// ─────────────────────────────────────────────────────────────────────────────
 export const inscripciongrupoPatch = async (req, res, next) => {
     try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+        const id = parsePositiveInt(req.params.id);
+        if (id === null) {
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
         const { id_periodo_grupo, id_usuario_inscrito } = req.body;
+
         if (id_periodo_grupo === undefined && id_usuario_inscrito === undefined) {
-            return res.status(400).json({ success: false, message: 'Al menos un campo debe ser proporcionado para la actualización' });
+            return res.status(400).json({
+                success: false,
+                message: 'Se requiere al menos uno de los campos: id_periodo_grupo, id_usuario_inscrito'
+            });
         }
 
-        // Realizar la actualización dentro de una transacción para mayor seguridad
-        const updated = await sequelize.transaction(async (t) => {
-            const record = await InscripcionesGrupos.findByPk(id, { transaction: t });
-            if (!record) return null;
+        // Validar cada campo si fue enviado
+        let idPeriodo, idUsuario;
 
-            // Determinar nuevos valores (mantener los existentes cuando no se provean)
-            const newPeriodo = id_periodo_grupo !== undefined ? id_periodo_grupo : record.id_periodo_grupo;
-            const newUsuario = id_usuario_inscrito !== undefined ? id_usuario_inscrito : record.id_usuario_inscrito;
+        if (id_periodo_grupo !== undefined) {
+            idPeriodo = parsePositiveInt(id_periodo_grupo);
+            if (idPeriodo === null) {
+                return res.status(400).json({ success: false, message: 'El campo id_periodo_grupo debe ser un entero positivo' });
+            }
+        }
 
-            // Si hubo algún cambio significativo, verificar que no se genere un duplicado
-            if (newPeriodo !== record.id_periodo_grupo || newUsuario !== record.id_usuario_inscrito) {
-                const exists = await InscripcionesGrupos.findOne({
+        if (id_usuario_inscrito !== undefined) {
+            idUsuario = parsePositiveInt(id_usuario_inscrito);
+            if (idUsuario === null) {
+                return res.status(400).json({ success: false, message: 'El campo id_usuario_inscrito debe ser un entero positivo' });
+            }
+        }
+
+        const actualizado = await sequelize.transaction(async (t) => {
+            const registro = await InscripcionesGrupos.findByPk(id, { transaction: t });
+            if (!registro) return null;
+
+            // Resolver valores finales (los recibidos o los existentes)
+            const idPeriodoFinal = idPeriodo  ?? registro.id_periodo_grupo;
+            const idUsuarioFinal = idUsuario  ?? registro.id_usuario_inscrito;
+
+            // Verificar duplicado solo si la clave compuesta cambia
+            const cambiaClave =
+                idPeriodoFinal !== registro.id_periodo_grupo ||
+                idUsuarioFinal !== registro.id_usuario_inscrito;
+
+            if (cambiaClave) {
+                const duplicado = await InscripcionesGrupos.findOne({
                     where: {
-                        id_periodo_grupo: newPeriodo,
-                        id_usuario_inscrito: newUsuario,
+                        id_periodo_grupo:    idPeriodoFinal,
+                        id_usuario_inscrito: idUsuarioFinal,
                         id_inscripciongrupo: { [Op.ne]: id }
                     },
                     transaction: t
                 });
-
-                if (exists) {
+                if (duplicado) {
                     const err = new Error('El usuario ya está inscrito en este periodo de grupo');
                     err.statusCode = 409;
                     throw err;
                 }
             }
 
-            await record.update({
-                id_periodo_grupo: newPeriodo,
-                id_usuario_inscrito: newUsuario
-            }, { transaction: t });
+            await registro.update(
+                { id_periodo_grupo: idPeriodoFinal, id_usuario_inscrito: idUsuarioFinal },
+                { transaction: t }
+            );
 
-            return record;
+            // Recargar desde BD para retornar estado persistido
+            return await InscripcionesGrupos.findByPk(id, { transaction: t });
         });
 
-        if (!updated) {
+        if (!actualizado) {
             return res.status(404).json({ success: false, message: 'Inscripción de grupo no encontrada' });
         }
 
         return res.status(200).json({
             success: true,
             message: 'Inscripción de grupo actualizada parcialmente',
-            data: updated
+            data: actualizado
         });
     } catch (error) {
-        console.error('Error en inscripciongrupoPatch:', error.message || error);
-        // manejar errores generados manualmente
-        if (error.statusCode) {
-            return res.status(error.statusCode).json({ success: false, message: error.message });
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
         }
+        console.error('[inscripciongrupoPatch]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Eliminar una inscripción de grupo por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /inscripcionesgrupos/:id  →  eliminar registro por PK
+// ─────────────────────────────────────────────────────────────────────────────
 export const inscripciongrupoDelete = async (req, res, next) => {
     try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+        const id = parsePositiveInt(req.params.id);
+        if (id === null) {
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        // Eliminar dentro de transacción
-        const deleted = await sequelize.transaction(async (t) => {
-            const record = await InscripcionesGrupos.findByPk(id, { transaction: t });
-            if (!record) return null;
+        const eliminado = await sequelize.transaction(async (t) => {
+            const registro = await InscripcionesGrupos.findByPk(id, { transaction: t });
+            if (!registro) return null;
 
-            const snapshot = record.get({ plain: true });
-            await record.destroy({ transaction: t });
+            const snapshot = registro.get({ plain: true });
+            await registro.destroy({ transaction: t });
             return snapshot;
         });
 
-        if (!deleted) {
+        if (!eliminado) {
             return res.status(404).json({ success: false, message: 'Inscripción de grupo no encontrada' });
         }
 
         return res.status(200).json({
             success: true,
             message: 'Inscripción de grupo eliminada correctamente',
-            data: deleted
+            data: eliminado
         });
     } catch (error) {
-        // Manejo específico de FK constraint
-        if (error.name === 'SequelizeForeignKeyConstraintError' || /foreign key|referenc/i.test(error.message || '')) {
+        // Integridad referencial
+        if (
+            error.name === 'SequelizeForeignKeyConstraintError' ||
+            /foreign key|referenc/i.test(error.message || '')
+        ) {
             return res.status(409).json({
                 success: false,
-                message: 'No se puede eliminar: existen referencias en otras tablas'
+                message: 'No se puede eliminar: la inscripción está referenciada en otras tablas'
             });
         }
-        console.error('Error en inscripciongrupoDelete:', error.message || error);
+        console.error('[inscripciongrupoDelete]', error.message || error);
         return next(error);
     }
-}
-
+};

@@ -2,297 +2,385 @@ import Periodos from "../../models/grupos/periodos.model.js";
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
-// Obtener todas los periodos de los grupos
+// ─── Campos permitidos para ordenamiento ─────────────────────────────────────
+const ALLOWED_SORT_FIELDS = ['id_periodo', 'periodo', 'fecha_inicio', 'fecha_fin'];
+const DEFAULT_SORT_FIELD  = 'id_periodo';
+
+// ─── Helper: parsear y validar fecha ─────────────────────────────────────────
+/**
+ * Convierte una cadena a Date. Devuelve null si el valor es nulo/undefined/vacío,
+ * y lanza un error descriptivo si la cadena no es una fecha válida.
+ */
+const parseDate = (value, fieldName) => {
+    if (value === undefined || value === null || value === '') return null;
+    const d = new Date(value);
+    if (isNaN(d.getTime())) {
+        const err = new Error(`El campo ${fieldName} no es una fecha válida`);
+        err.statusCode = 400;
+        throw err;
+    }
+    return d;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /periodos  →  lista paginada con búsqueda y ordenamiento
+// ─────────────────────────────────────────────────────────────────────────────
 export const periodosGet = async (req, res, next) => {
     try {
-        // Paginación y límites seguros
-        const page = Math.max(1, Number(req.query.page) || 1);
-        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+        // Paginación segura
+        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
+        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
         const offset = (page - 1) * limit;
 
-        // Búsqueda por texto
-        const q = (req.query.q || '').trim();
+        // Búsqueda por texto en campo periodo
+        const q     = (req.query.q || '').trim();
         const where = q ? { periodo: { [Op.like]: `%${q}%` } } : {};
 
-        // Orden seguro
-        const [sortField = 'id_periodo', sortOrderRaw = 'asc'] = (req.query.sort || 'id_periodo:asc').split(':');
-        const allowedSortFields = ['id_periodo', 'periodo'];
-        const sortFieldSafe = allowedSortFields.includes(sortField) ? sortField : 'id_periodo';
-        const sortOrder = (String(sortOrderRaw).toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+        // Ordenamiento seguro
+        const [sortField = DEFAULT_SORT_FIELD, sortOrderRaw = 'asc'] =
+            (req.query.sort || `${DEFAULT_SORT_FIELD}:asc`).split(':');
+        const sortFieldSafe = ALLOWED_SORT_FIELDS.includes(sortField) ? sortField : DEFAULT_SORT_FIELD;
+        const sortOrder     = sortOrderRaw.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
 
-        // Consulta dentro de transacción
-        const result = await sequelize.transaction(async (t) => {
-            return await Periodos.findAndCountAll({
-                where,
-                limit,
-                offset,
-                order: [[sortFieldSafe, sortOrder]],
-                transaction: t
-            });
+        // Consulta (lectura: sin transacción explícita)
+        const { count, rows } = await Periodos.findAndCountAll({
+            where,
+            limit,
+            offset,
+            order: [[sortFieldSafe, sortOrder]]
         });
 
-        const total = result.count;
+        const total = count;
         const pages = Math.ceil(total / limit) || 1;
 
         return res.status(200).json({
             success: true,
             meta: { total, page, pages, limit, sort: `${sortFieldSafe}:${sortOrder}` },
-            data: result.rows
+            data: rows
         });
     } catch (error) {
-        console.error('Error en periodosGet:', error.message || error);
+        console.error('[periodosGet]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Obtener un periodo de grupo por ID
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /periodos/:id  →  registro único por PK
+// ─────────────────────────────────────────────────────────────────────────────
 export const periodoGetById = async (req, res, next) => {
     try {
-        const id = Number(req.params.id);
+        const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        const categoria = await sequelize.transaction(async (t) => {
-            return await Periodos.findByPk(id, { transaction: t });
-        });
+        // Lectura simple: sin transacción explícita
+        const periodo = await Periodos.findByPk(id);
 
-        if (!categoria) {
+        if (!periodo) {
             return res.status(404).json({ success: false, message: 'Periodo no encontrado' });
         }
 
-        return res.status(200).json({ success: true, data: categoria });
+        return res.status(200).json({ success: true, data: periodo });
     } catch (error) {
-        console.error('Error en periodoGetById:', error.message || error);
+        console.error('[periodoGetById]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Crear un periodo de grupo
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /periodos  →  crear nuevo periodo
+// ─────────────────────────────────────────────────────────────────────────────
 export const periodoPost = async (req, res, next) => {
     try {
         const { periodo, fecha_inicio, fecha_fin } = req.body;
 
-        // Validación básica
+        // Validar campo periodo (obligatorio)
         if (!periodo || typeof periodo !== 'string' || periodo.trim() === '') {
             return res.status(400).json({ success: false, message: 'El campo periodo es obligatorio' });
         }
+        const periodoValue = periodo.trim();
 
-        // validación de capctura de fechas de inicio y fin (opcional)
-        if (fecha_inicio && isNaN(Date.parse(fecha_inicio))) {
-            return res.status(400).json({ success: false, message: 'El campo fecha_inicio debe ser una fecha válida' });
+        // Longitud máxima desde el modelo (se usa el valor ya recortado)
+        const attrs     = Periodos.rawAttributes || {};
+        const maxLength = attrs.periodo?.type?.options?.length
+                       ?? attrs.periodo?._length
+                       ?? 100;
+        if (periodoValue.length > maxLength) {
+            return res.status(400).json({
+                success: false,
+                message: `El campo periodo no puede exceder ${maxLength} caracteres`
+            });
         }
 
-        if (fecha_fin && isNaN(Date.parse(fecha_fin))) {
-            return res.status(400).json({ success: false, message: 'El campo fecha_fin debe ser una fecha válida' });
+        // Validar y normalizar fechas opcionales
+        let fechaInicioVal, fechaFinVal;
+        try {
+            fechaInicioVal = parseDate(fecha_inicio, 'fecha_inicio');
+            fechaFinVal    = parseDate(fecha_fin,    'fecha_fin');
+        } catch (e) {
+            return res.status(400).json({ success: false, message: e.message });
         }
 
-        // Longitud desde el modelo (si está definida)
-        const attrs = Periodos.rawAttributes || {};
-        const maxLength = attrs.periodo?.type?.options?.length ?? attrs.periodo?._length ?? 20;
-        if (periodo.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo periodo no puede exceder ${maxLength} caracteres` });
+        // Coherencia de rango: fecha_inicio debe ser anterior a fecha_fin
+        if (fechaInicioVal && fechaFinVal && fechaInicioVal > fechaFinVal) {
+            return res.status(400).json({ success: false, message: 'fecha_inicio no puede ser posterior a fecha_fin' });
         }
 
-        // Verificar duplicado
-        const exists_periodo = await Periodos.findOne({ where: { periodo: periodo } });
-       
-        if (exists_periodo) {
+        // Verificar duplicado de nombre de periodo
+        const existe = await Periodos.findOne({ where: { periodo: periodoValue } });
+        if (existe) {
             return res.status(409).json({ success: false, message: 'El periodo ya existe' });
         }
 
         // Crear dentro de transacción
         const nuevo = await sequelize.transaction(async (t) => {
-            return await Periodos.create({ periodo, fecha_inicio, fecha_fin }, { transaction: t });
+            return await Periodos.create(
+                { periodo: periodoValue, fecha_inicio: fechaInicioVal, fecha_fin: fechaFinVal },
+                { transaction: t }
+            );
         });
 
-        return res.status(201).json({ success: true, message: 'Periodo creado exitosamente', data: nuevo });
+        return res.status(201).json({
+            success: true,
+            message: 'Periodo creado exitosamente',
+            data: nuevo
+        });
     } catch (error) {
-        console.error('Error en periodosPost:', error.message || error);
+        console.error('[periodoPost]', error.message || error);
         return next(error);
     }
-}
+};
 
-// Actualizar un periodo por ID (PUT - requerido todos los campos principales)
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /periodos/:id  →  reemplazo total del registro
+// ─────────────────────────────────────────────────────────────────────────────
 export const periodoPut = async (req, res, next) => {
     try {
-        const { periodo, fecha_inicio, fecha_fin } = req.body;
-
-        const id = Number(req.params.id);
+        const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
         }
 
-        // Validar campo periodo (obligatorio)
+        const { periodo, fecha_inicio, fecha_fin } = req.body;
+
+        // Validar campo periodo (obligatorio en PUT)
         if (!periodo || typeof periodo !== 'string' || periodo.trim() === '') {
             return res.status(400).json({ success: false, message: 'El campo periodo es obligatorio' });
         }
-        const value = periodo.trim();
+        const periodoValue = periodo.trim();
 
-        // Obtener longitud máxima desde el modelo
-        const attrs = Periodos.rawAttributes || {};
-        const maxLength = attrs.periodo?.type?.options?.length ?? attrs.periodo?._length ?? 20;
-        if (value.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo periodo no puede exceder ${maxLength} caracteres` });
+        // Longitud máxima desde el modelo
+        const attrs     = Periodos.rawAttributes || {};
+        const maxLength = attrs.periodo?.type?.options?.length
+                       ?? attrs.periodo?._length
+                       ?? 100;
+        if (periodoValue.length > maxLength) {
+            return res.status(400).json({
+                success: false,
+                message: `El campo periodo no puede exceder ${maxLength} caracteres`
+            });
         }
 
-        // Validar fechas opcionales
-        if (fecha_inicio && isNaN(Date.parse(fecha_inicio))) {
-            return res.status(400).json({ success: false, message: 'El campo fecha_inicio debe ser una fecha válida' });
-        }
-        if (fecha_fin && isNaN(Date.parse(fecha_fin))) {
-            return res.status(400).json({ success: false, message: 'El campo fecha_fin debe ser una fecha válida' });
+        // Validar y normalizar fechas (null si no se envían → reemplazo total)
+        let fechaInicioVal, fechaFinVal;
+        try {
+            fechaInicioVal = parseDate(fecha_inicio, 'fecha_inicio');
+            fechaFinVal    = parseDate(fecha_fin,    'fecha_fin');
+        } catch (e) {
+            return res.status(400).json({ success: false, message: e.message });
         }
 
-        // Actualizar dentro de transacción
-        const updated = await sequelize.transaction(async (t) => {
-            const record = await Periodos.findByPk(id, { transaction: t });
-            if (!record) return null;
+        // Coherencia de rango
+        if (fechaInicioVal && fechaFinVal && fechaInicioVal > fechaFinVal) {
+            return res.status(400).json({ success: false, message: 'fecha_inicio no puede ser posterior a fecha_fin' });
+        }
 
-            // Verificar duplicado: si el periodo cambió, comprobar que no exista otro con el mismo valor
-            if (value !== record.periodo) {
-                const exists = await Periodos.findOne({
-                    where: {
-                        periodo: value,
-                        id_periodo: { [Op.ne]: id }
-                    },
+        const actualizado = await sequelize.transaction(async (t) => {
+            const registro = await Periodos.findByPk(id, { transaction: t });
+            if (!registro) return null;
+
+            // Verificar duplicado de nombre si cambió
+            if (periodoValue !== registro.periodo) {
+                const duplicado = await Periodos.findOne({
+                    where: { periodo: periodoValue, id_periodo: { [Op.ne]: id } },
                     transaction: t
                 });
-
-                if (exists) {
+                if (duplicado) {
                     const err = new Error('El periodo ya existe');
                     err.statusCode = 409;
                     throw err;
                 }
             }
 
-            await record.update({ periodo: value, fecha_inicio, fecha_fin }, { transaction: t });
+            await registro.update(
+                { periodo: periodoValue, fecha_inicio: fechaInicioVal, fecha_fin: fechaFinVal },
+                { transaction: t }
+            );
             return await Periodos.findByPk(id, { transaction: t });
         });
 
-        if (!updated) {
+        if (!actualizado) {
             return res.status(404).json({ success: false, message: 'Periodo no encontrado' });
-        }
-
-        return res.status(200).json({ success: true, message: 'Periodo actualizado exitosamente', data: updated });
-    } catch (error) {
-        console.error('Error en periodoPut:', error.message || error);
-        if (error.statusCode) {
-            return res.status(error.statusCode).json({ success: false, message: error.message });
-        }
-        return next(error);
-    }
-}
-
-// Actualizar parcialmente un periodo por ID (PATCH - campos opcionales)
-export const periodoPatch = async (req, res, next) => {
-    try {
-        const { periodo, fecha_inicio, fecha_fin } = req.body;
-
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
-        }
-
-        // Validar campo periodo (obligatorio)
-        if (!periodo || typeof periodo !== 'string' || periodo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo periodo es obligatorio' });
-        }
-        const value = periodo.trim();
-
-        // Obtener longitud máxima desde el modelo
-        const attrs = Periodos.rawAttributes || {};
-        const maxLength = attrs.periodo?.type?.options?.length ?? attrs.periodo?._length ?? 20;
-        if (value.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo periodo no puede exceder ${maxLength} caracteres` });
-        }
-
-        // Validar fechas opcionales
-        if (fecha_inicio && isNaN(Date.parse(fecha_inicio))) {
-            return res.status(400).json({ success: false, message: 'El campo fecha_inicio debe ser una fecha válida' });
-        }
-        if (fecha_fin && isNaN(Date.parse(fecha_fin))) {
-            return res.status(400).json({ success: false, message: 'El campo fecha_fin debe ser una fecha válida' });
-        }
-
-        // Actualizar dentro de transacción
-        const updated = await sequelize.transaction(async (t) => {
-            const record = await Periodos.findByPk(id, { transaction: t });
-            if (!record) return null;
-
-            // Verificar duplicado: si el periodo cambió, comprobar que no exista otro con el mismo valor
-            if (value !== record.periodo) {
-                const exists = await Periodos.findOne({
-                    where: {
-                        periodo: value,
-                        id_periodo: { [Op.ne]: id }
-                    },
-                    transaction: t
-                });
-
-                if (exists) {
-                    const err = new Error('El periodo ya existe');
-                    err.statusCode = 409;
-                    throw err;
-                }
-            }
-
-            await record.update({ periodo: value, fecha_inicio, fecha_fin }, { transaction: t });
-            return await Periodos.findByPk(id, { transaction: t });
-        });
-
-        if (!updated) {
-            return res.status(404).json({ success: false, message: 'Periodo no encontrado' });
-        }
-
-        return res.status(200).json({ success: true, message: 'Periodo actualizado exitosamente', data: updated });
-    } catch (error) {
-        console.error('Error en periodoPut:', error.message || error);
-        if (error.statusCode) {
-            return res.status(error.statusCode).json({ success: false, message: error.message });
-        }
-        return next(error);
-    }
-    }
-
-
-// Eliminar una inscripción de grupo por ID
-export const periodoDelete = async (req, res, next) => {
-    try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
-        }
-
-        // Eliminar dentro de transacción
-        const deleted = await sequelize.transaction(async (t) => {
-            const record = await Periodos.findByPk(id, { transaction: t });
-            if (!record) return null;
-
-            const snapshot = record.get({ plain: true });
-            await record.destroy({ transaction: t });
-            return snapshot;
-        });
-
-        if (!deleted) {
-            return res.status(404).json({ success: false, message: 'Inscripción de grupo no encontrada' });
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Inscripción de grupo eliminada correctamente',
-            data: deleted
+            message: 'Periodo actualizado exitosamente',
+            data: actualizado
         });
     } catch (error) {
-        // Manejo específico de FK constraint
-        if (error.name === 'SequelizeForeignKeyConstraintError' || /foreign key|referenc/i.test(error.message || '')) {
-            return res.status(409).json({
-                success: false,
-                message: 'No se puede eliminar: existen referencias en otras tablas'
-            });
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
         }
-        console.error('Error en periodoDelete:', error.message || error);
+        console.error('[periodoPut]', error.message || error);
         return next(error);
     }
-}
+};
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /periodos/:id  →  actualización parcial del registro
+// ─────────────────────────────────────────────────────────────────────────────
+export const periodoPatch = async (req, res, next) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
+        }
+
+        const camposPermitidos = ['periodo', 'fecha_inicio', 'fecha_fin'];
+        const camposRecibidos  = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
+
+        if (camposRecibidos.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Se requiere al menos uno de los campos: ${camposPermitidos.join(', ')}`
+            });
+        }
+
+        // Construir objeto de cambios validados
+        const cambios = {};
+
+        if ('periodo' in req.body) {
+            const { periodo } = req.body;
+            if (typeof periodo !== 'string' || periodo.trim() === '') {
+                return res.status(400).json({ success: false, message: 'El campo periodo no es válido' });
+            }
+            const periodoValue = periodo.trim();
+
+            const attrs     = Periodos.rawAttributes || {};
+            const maxLength = attrs.periodo?.type?.options?.length
+                           ?? attrs.periodo?._length
+                           ?? 100;
+            if (periodoValue.length > maxLength) {
+                return res.status(400).json({
+                    success: false,
+                    message: `El campo periodo no puede exceder ${maxLength} caracteres`
+                });
+            }
+            cambios.periodo = periodoValue;
+        }
+
+        // Validar fechas solo si fueron enviadas
+        try {
+            if ('fecha_inicio' in req.body) {
+                cambios.fecha_inicio = parseDate(req.body.fecha_inicio, 'fecha_inicio');
+            }
+            if ('fecha_fin' in req.body) {
+                cambios.fecha_fin = parseDate(req.body.fecha_fin, 'fecha_fin');
+            }
+        } catch (e) {
+            return res.status(400).json({ success: false, message: e.message });
+        }
+
+        const actualizado = await sequelize.transaction(async (t) => {
+            const registro = await Periodos.findByPk(id, { transaction: t });
+            if (!registro) return null;
+
+            // Coherencia de rango usando valores finales
+            const fechaInicioFinal = 'fecha_inicio' in cambios ? cambios.fecha_inicio : registro.fecha_inicio;
+            const fechaFinFinal    = 'fecha_fin'    in cambios ? cambios.fecha_fin    : registro.fecha_fin;
+            if (fechaInicioFinal && fechaFinFinal && fechaInicioFinal > fechaFinFinal) {
+                const err = new Error('fecha_inicio no puede ser posterior a fecha_fin');
+                err.statusCode = 400;
+                throw err;
+            }
+
+            // Verificar duplicado de nombre si cambió
+            if ('periodo' in cambios && cambios.periodo !== registro.periodo) {
+                const duplicado = await Periodos.findOne({
+                    where: { periodo: cambios.periodo, id_periodo: { [Op.ne]: id } },
+                    transaction: t
+                });
+                if (duplicado) {
+                    const err = new Error('El periodo ya existe');
+                    err.statusCode = 409;
+                    throw err;
+                }
+            }
+
+            await registro.update(cambios, { transaction: t });
+            return await Periodos.findByPk(id, { transaction: t });
+        });
+
+        if (!actualizado) {
+            return res.status(404).json({ success: false, message: 'Periodo no encontrado' });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Periodo actualizado parcialmente',
+            data: actualizado
+        });
+    } catch (error) {
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({ success: false, message: error.message });
+        }
+        console.error('[periodoPatch]', error.message || error);
+        return next(error);
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /periodos/:id  →  eliminar registro por PK
+// ─────────────────────────────────────────────────────────────────────────────
+export const periodoDelete = async (req, res, next) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
+        }
+
+        const eliminado = await sequelize.transaction(async (t) => {
+            const registro = await Periodos.findByPk(id, { transaction: t });
+            if (!registro) return null;
+
+            const snapshot = registro.get({ plain: true });
+            await registro.destroy({ transaction: t });
+            return snapshot;
+        });
+
+        if (!eliminado) {
+            return res.status(404).json({ success: false, message: 'Periodo no encontrado' });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Periodo eliminado correctamente',
+            data: eliminado
+        });
+    } catch (error) {
+        // Integridad referencial
+        if (
+            error.name === 'SequelizeForeignKeyConstraintError' ||
+            /foreign key|referenc/i.test(error.message || '')
+        ) {
+            return res.status(409).json({
+                success: false,
+                message: 'No se puede eliminar: el periodo está referenciado en otras tablas'
+            });
+        }
+        console.error('[periodoDelete]', error.message || error);
+        return next(error);
+    }
+};

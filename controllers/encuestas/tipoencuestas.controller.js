@@ -1,24 +1,27 @@
-import EstatusGrupo from "../../models/grupos/estatusgrupos.model.js";
+import TipoEncuestas from "../../models/encuestas/tipoencuestas.model.js";
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
 // ─── Campos permitidos para ordenamiento ─────────────────────────────────────
-const ALLOWED_SORT_FIELDS = ['id_estatusgrupo', 'estatus_grupo'];
-const DEFAULT_SORT_FIELD  = 'id_estatusgrupo';
+const ALLOWED_SORT_FIELDS = ['id_tipoencuesta', 'tipo_encuesta'];
+const DEFAULT_SORT_FIELD  = 'id_tipoencuesta';
+
+// ─── Longitudes máximas derivadas del modelo ──────────────────────────────────
+const MAX_TIPO_ENCUESTA = 50;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /estatusgrupos  →  lista paginada con búsqueda y ordenamiento
+// GET /tipoencuestas  →  lista paginada con búsqueda y ordenamiento
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatusgruposGet = async (req, res, next) => {
+export const tipoencuestasGet = async (req, res, next) => {
     try {
         // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
+        const page   = Math.max(1, parseInt(req.query.page,  10) || 1);
         const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
         const offset = (page - 1) * limit;
 
-        // Búsqueda por texto sobre el campo correcto
+        // Búsqueda por texto sobre el campo tipo_encuesta
         const q     = (req.query.q || '').trim();
-        const where = q ? { estatus_grupo: { [Op.like]: `%${q}%` } } : {};
+        const where = q ? { tipo_encuesta: { [Op.like]: `%${q}%` } } : {};
 
         // Ordenamiento seguro
         const [sortField = DEFAULT_SORT_FIELD, sortOrderRaw = 'asc'] =
@@ -27,7 +30,7 @@ export const estatusgruposGet = async (req, res, next) => {
         const sortOrder     = sortOrderRaw.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
 
         // Consulta (lectura: sin transacción explícita)
-        const { count, rows } = await EstatusGrupo.findAndCountAll({
+        const { count, rows } = await TipoEncuestas.findAndCountAll({
             where,
             limit,
             offset,
@@ -43,230 +46,254 @@ export const estatusgruposGet = async (req, res, next) => {
             data: rows
         });
     } catch (error) {
-        console.error('[estatusgruposGet]', error.message || error);
+        console.error('[tipoencuestasGet]', error.message || error);
         return next(error);
     }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /estatusgrupos/:id  →  registro único por PK
+// GET /tipoencuestas/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatusgruposGetById = async (req, res, next) => {
+export const tipoencuestasGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
+            return res.status(400).json({
+                success: false,
+                message: 'ID inválido: debe ser un entero positivo'
+            });
         }
 
         // Lectura simple: sin transacción explícita
-        const registro = await EstatusGrupo.findByPk(id);
+        const registro = await TipoEncuestas.findByPk(id);
 
         if (!registro) {
-            return res.status(404).json({ success: false, message: 'Estatus de grupo no encontrado' });
+            return res.status(404).json({
+                success: false,
+                message: 'Tipo de encuesta no encontrado'
+            });
         }
 
         return res.status(200).json({ success: true, data: registro });
     } catch (error) {
-        console.error('[estatusgruposGetById]', error.message || error);
+        console.error('[tipoencuestasGetById]', error.message || error);
         return next(error);
     }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /estatusgrupos  →  crear nuevo estatus de grupo
+// POST /tipoencuestas  →  crear nuevo tipo de encuesta
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatusgrupoPost = async (req, res, next) => {
+export const tipoencuestasPost = async (req, res, next) => {
     try {
-        const { estatus_grupo } = req.body;
+        const { tipo_encuesta } = req.body;
 
-        // Validación básica
-        if (!estatus_grupo || typeof estatus_grupo !== 'string' || estatus_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_grupo es obligatorio' });
-        }
-        const value = estatus_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = EstatusGrupo.rawAttributes || {};
-        const maxLength = attrs.estatus_grupo?.type?.options?.length
-                       ?? attrs.estatus_grupo?._length
-                       ?? 20;
-        if (value.length > maxLength) {
+        // ── Validación: tipo_encuesta ────────────────────────────────────────
+        if (!tipo_encuesta || typeof tipo_encuesta !== 'string' || tipo_encuesta.trim() === '') {
             return res.status(400).json({
                 success: false,
-                message: `El campo estatus_grupo no puede exceder ${maxLength} caracteres`
+                message: 'El campo tipo_encuesta es obligatorio'
+            });
+        }
+        const value = tipo_encuesta.trim();
+        if (value.length > MAX_TIPO_ENCUESTA) {
+            return res.status(400).json({
+                success: false,
+                message: `El campo tipo_encuesta no puede exceder ${MAX_TIPO_ENCUESTA} caracteres`
             });
         }
 
         // Verificar duplicado
-        const exists = await EstatusGrupo.findOne({ where: { estatus_grupo: value } });
+        const exists = await TipoEncuestas.findOne({ where: { tipo_encuesta: value } });
         if (exists) {
-            return res.status(409).json({ success: false, message: 'El estatus de grupo ya existe' });
+            return res.status(409).json({
+                success: false,
+                message: 'El tipo de encuesta ya existe'
+            });
         }
 
         // Crear dentro de transacción
         const nuevo = await sequelize.transaction(async (t) => {
-            return await EstatusGrupo.create({ estatus_grupo: value }, { transaction: t });
+            return await TipoEncuestas.create({ tipo_encuesta: value }, { transaction: t });
         });
 
         return res.status(201).json({
             success: true,
-            message: 'Estatus de grupo creado exitosamente',
+            message: 'Tipo de encuesta creado exitosamente',
             data: nuevo
         });
     } catch (error) {
-        console.error('[estatusgrupoPost]', error.message || error);
+        console.error('[tipoencuestasPost]', error.message || error);
         return next(error);
     }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PUT /estatusgrupos/:id  →  reemplazo total del registro
+// PUT /tipoencuestas/:id  →  reemplazo total del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatusgrupoPut = async (req, res, next) => {
+export const tipoencuestasPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
-
-        const { estatus_grupo } = req.body;
-        if (!estatus_grupo || typeof estatus_grupo !== 'string' || estatus_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_grupo es obligatorio' });
-        }
-        const value = estatus_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = EstatusGrupo.rawAttributes || {};
-        const maxLength = attrs.estatus_grupo?.type?.options?.length
-                       ?? attrs.estatus_grupo?._length
-                       ?? 20;
-        if (value.length > maxLength) {
             return res.status(400).json({
                 success: false,
-                message: `El campo estatus_grupo no puede exceder ${maxLength} caracteres`
+                message: 'ID inválido: debe ser un entero positivo'
+            });
+        }
+
+        const { tipo_encuesta } = req.body;
+        if (!tipo_encuesta || typeof tipo_encuesta !== 'string' || tipo_encuesta.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'El campo tipo_encuesta es obligatorio'
+            });
+        }
+        const value = tipo_encuesta.trim();
+        if (value.length > MAX_TIPO_ENCUESTA) {
+            return res.status(400).json({
+                success: false,
+                message: `El campo tipo_encuesta no puede exceder ${MAX_TIPO_ENCUESTA} caracteres`
             });
         }
 
         const actualizado = await sequelize.transaction(async (t) => {
-            const registro = await EstatusGrupo.findByPk(id, { transaction: t });
+            const registro = await TipoEncuestas.findByPk(id, { transaction: t });
             if (!registro) return null;
 
             // Verificar duplicado (excluir el propio registro)
-            const duplicado = await EstatusGrupo.findOne({
-                where: { estatus_grupo: value, id_estatusgrupo: { [Op.ne]: id } },
+            const duplicado = await TipoEncuestas.findOne({
+                where: {
+                    tipo_encuesta:   value,
+                    id_tipoencuesta: { [Op.ne]: id }
+                },
                 transaction: t
             });
             if (duplicado) {
-                const err = new Error('El estatus de grupo ya existe');
+                const err = new Error('El tipo de encuesta ya existe');
                 err.statusCode = 409;
                 throw err;
             }
 
-            await registro.update({ estatus_grupo: value }, { transaction: t });
-            return await EstatusGrupo.findByPk(id, { transaction: t });
+            await registro.update({ tipo_encuesta: value }, { transaction: t });
+            return await TipoEncuestas.findByPk(id, { transaction: t });
         });
 
         if (!actualizado) {
-            return res.status(404).json({ success: false, message: 'Estatus de grupo no encontrado' });
+            return res.status(404).json({
+                success: false,
+                message: 'Tipo de encuesta no encontrado'
+            });
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Estatus de grupo actualizado exitosamente',
+            message: 'Tipo de encuesta actualizado exitosamente',
             data: actualizado
         });
     } catch (error) {
         if (error.statusCode === 409) {
             return res.status(409).json({ success: false, message: error.message });
         }
-        console.error('[estatusgrupoPut]', error.message || error);
+        console.error('[tipoencuestasPut]', error.message || error);
         return next(error);
     }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PATCH /estatusgrupos/:id  →  actualización parcial del registro
+// PATCH /tipoencuestas/:id  →  actualización parcial del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatusgrupoPatch = async (req, res, next) => {
+export const tipoencuestasPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
-
-        const { estatus_grupo } = req.body;
-        if (typeof estatus_grupo === 'undefined' || estatus_grupo === null) {
-            return res.status(400).json({ success: false, message: 'El campo estatus_grupo es requerido' });
-        }
-        if (typeof estatus_grupo !== 'string' || estatus_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_grupo no es válido' });
-        }
-
-        const value = estatus_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = EstatusGrupo.rawAttributes || {};
-        const maxLength = attrs.estatus_grupo?.type?.options?.length
-                       ?? attrs.estatus_grupo?._length
-                       ?? 20;
-        if (value.length > maxLength) {
             return res.status(400).json({
                 success: false,
-                message: `El campo estatus_grupo no puede exceder ${maxLength} caracteres`
+                message: 'ID inválido: debe ser un entero positivo'
+            });
+        }
+
+        const { tipo_encuesta } = req.body;
+        if (typeof tipo_encuesta === 'undefined' || tipo_encuesta === null) {
+            return res.status(400).json({
+                success: false,
+                message: 'El campo tipo_encuesta es requerido'
+            });
+        }
+        if (typeof tipo_encuesta !== 'string' || tipo_encuesta.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'El campo tipo_encuesta no es válido'
+            });
+        }
+
+        const value = tipo_encuesta.trim();
+        if (value.length > MAX_TIPO_ENCUESTA) {
+            return res.status(400).json({
+                success: false,
+                message: `El campo tipo_encuesta no puede exceder ${MAX_TIPO_ENCUESTA} caracteres`
             });
         }
 
         const actualizado = await sequelize.transaction(async (t) => {
-            const registro = await EstatusGrupo.findByPk(id, { transaction: t });
+            const registro = await TipoEncuestas.findByPk(id, { transaction: t });
             if (!registro) return null;
 
             // Solo verificar duplicado si el valor realmente cambia
-            if (registro.estatus_grupo !== value) {
-                const duplicado = await EstatusGrupo.findOne({
-                    where: { estatus_grupo: value, id_estatusgrupo: { [Op.ne]: id } },
+            if (registro.tipo_encuesta !== value) {
+                const duplicado = await TipoEncuestas.findOne({
+                    where: {
+                        tipo_encuesta:   value,
+                        id_tipoencuesta: { [Op.ne]: id }
+                    },
                     transaction: t
                 });
                 if (duplicado) {
-                    const err = new Error('El estatus de grupo ya existe');
+                    const err = new Error('El tipo de encuesta ya existe');
                     err.statusCode = 409;
                     throw err;
                 }
             }
 
-            await registro.update({ estatus_grupo: value }, { transaction: t });
-            return await EstatusGrupo.findByPk(id, { transaction: t });
+            await registro.update({ tipo_encuesta: value }, { transaction: t });
+            return await TipoEncuestas.findByPk(id, { transaction: t });
         });
 
         if (!actualizado) {
-            return res.status(404).json({ success: false, message: 'Estatus de grupo no encontrado' });
+            return res.status(404).json({
+                success: false,
+                message: 'Tipo de encuesta no encontrado'
+            });
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Estatus de grupo actualizado parcialmente',
+            message: 'Tipo de encuesta actualizado parcialmente',
             data: actualizado
         });
     } catch (error) {
         if (error.statusCode === 409) {
             return res.status(409).json({ success: false, message: error.message });
         }
-        console.error('[estatusgrupoPatch]', error.message || error);
+        console.error('[tipoencuestasPatch]', error.message || error);
         return next(error);
     }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DELETE /estatusgrupos/:id  →  eliminar registro por PK
+// DELETE /tipoencuestas/:id  →  eliminar registro por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatusgrupoDelete = async (req, res, next) => {
+export const tipoencuestasDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
+            return res.status(400).json({
+                success: false,
+                message: 'ID inválido: debe ser un entero positivo'
+            });
         }
 
         const eliminado = await sequelize.transaction(async (t) => {
-            const registro = await EstatusGrupo.findByPk(id, { transaction: t });
+            const registro = await TipoEncuestas.findByPk(id, { transaction: t });
             if (!registro) return null;
 
             const snapshot = registro.get({ plain: true });
@@ -275,12 +302,15 @@ export const estatusgrupoDelete = async (req, res, next) => {
         });
 
         if (!eliminado) {
-            return res.status(404).json({ success: false, message: 'Estatus de grupo no encontrado' });
+            return res.status(404).json({
+                success: false,
+                message: 'Tipo de encuesta no encontrado'
+            });
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Estatus de grupo eliminado correctamente',
+            message: 'Tipo de encuesta eliminado correctamente',
             data: eliminado
         });
     } catch (error) {
@@ -291,10 +321,10 @@ export const estatusgrupoDelete = async (req, res, next) => {
         ) {
             return res.status(409).json({
                 success: false,
-                message: 'No se puede eliminar: el estatus de grupo está referenciado en otras tablas'
+                message: 'No se puede eliminar: el tipo de encuesta está referenciado en otras tablas'
             });
         }
-        console.error('[estatusgrupoDelete]', error.message || error);
+        console.error('[tipoencuestasDelete]', error.message || error);
         return next(error);
     }
 };
