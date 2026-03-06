@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import sequelize from '../database/sequelize.js';
+import { sequelize } from '../../database/mysql.js';  // Importante: importar { sequelize }
 
 const DetalleUsuariosEncuestas = sequelize.define('DetalleUsuariosEncuestas', {
     id_detalle_usuario_encuesta: {

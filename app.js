@@ -18,19 +18,37 @@ import estatusmaritalRouter from './routes/usuarios/estatusmaritales.routes.js';
 import estatususuarioRouter from './routes/usuarios/estatususuarios.routes.js';
 import tiposusuarioRouter from './routes/usuarios/tiposusuarios.routes.js';
 
-// importar rutas para encuestas
-import encuestaRouter from './routes/encuestas/encuestas.routes.js';
-
-// importar rutas para los grupos
-import grupoRouter from './routes/grupos/grupos.routes.js';
-
 // importar rutas para matriz de accesos
 import vistaRouter from './routes/matriz/vistas.routes.js';
 import matrizaccesorouter from './routes/matriz/matrizacceso.routes.js';
 
-// importar rutas para proveedores
-import proveedorRouter from './routes/proveedores/proveedores.routes.js';
+// importar rutas para encuestas
+import detalleusuariosencuestasRouter from './routes/encuestas/detalleusuariosencuestas.routes.js'
+import encuestasRouter from './routes/encuestas/encuestas.routes.js';
+import encuestaspreguntasrespuestasRouter from './routes/encuestas/encuestaspreguntasrespuestas.routes.js';
+import interpretacionresultadosRouter from './routes/encuestas/interpretacionresultados.routes.js';
+import preguntasRouter from './routes/encuestas/preguntas.routes.js';
+import respuestasRouter from './routes/encuestas/respuestas.routes.js';
+import tipoencuestasRouter from './routes/encuestas/tipoencuestas.routes.js';
+import usuariosencuestasRouter from './routes/encuestas/usuariosencuestas.routes.js';
 
+// importar rutas para los grupos
+import asistenciaRouter from './routes/grupos/asistencia.routes.js';
+import estatusgruposRouter from './routes/grupos/estatusgrupos.routes.js';
+import gruposRouter from './routes/grupos/grupos.routes.js';
+import inscripcionesgruposRouter from './routes/grupos/inscripcionesgrupos.routes.js';
+import periodosRouter from './routes/grupos/periodos.routes.js';
+import periodosgruposRouter from './routes/grupos/periodosgrupos.routes.js';
+import tiposgruposRouter from './routes/grupos/tiposgrupos.routes.js';
+
+// importar rutas para proveedores
+import estatuspublicacionesRouter from './routes/proveedores/estatuspublicaciones.routes.js';
+import proveedoresconserviciosRouter from './routes/proveedores/proveedoresconservicios.routes.js';
+import publicacionesRouter from './routes/proveedores/publicaciones.routes.js';
+import serviciosproveedoresRouter from './routes/proveedores/serviciosproveedores.routes.js';
+import tiposserviciosproveedoresRouter from './routes/proveedores/tiposserviciosproveedores.routes.js';
+
+// importar accesorios
 import cookieParser from 'cookie-parser';
 import session from "express-session";
 import { SESSION_SECRET, NODE_ENV } from './config/env.js';
@@ -139,6 +157,7 @@ app.use(securityMiddleware({
 // REGISTRO DE RUTAS
 // registrar rutas DESPUÉS de la definición de la session middleware
 
+// ********************************************************************************************
 // registrar rutas para autenticación
 app.use('/api/v1/auth', authRouter);
 
@@ -148,39 +167,55 @@ app.use('/api/v1/vistas', vistaRouter);
 // registrar matriz de accesos
 app.use('/api/v1/matrizaccesos', matrizaccesorouter);
 
-// registrar rutas para usuarios
-// api principal para los usuarios
+// ********************************************************************************************
+// api para los usuarios
 app.use('/api/v1/usuarios', usuarioRouter);
-
-// api principal para los generos
 app.use('/api/v1/generos', generoRouter);
-
-// api principal para los estados
 app.use('/api/v1/estados', estadoRouter);
-
-// api principal para los municipios
 app.use('/api/v1/municipios', municipioRouter);
-
-// api principal para los estatus maritales
 app.use('/api/v1/estatusmaritales', estatusmaritalRouter);
-
-// api principal para los estatus de usuarios
 app.use('/api/v1/estatususuarios', estatususuarioRouter);
-
-// api principal para las categorias de viviendas
 app.use('/api/v1/categoriasviviendas', categoriasviviendaRouter);
-
-// api principal para los tipos de usuarios
 app.use('/api/v1/tiposusuarios', tiposusuarioRouter);
 
-// api principal para los grupos
-app.use('/api/v1/grupos', grupoRouter);
+// ********************************************************************************************
+// api para los grupos
+app.use('/api/v1/asistencia', asistenciaRouter);
+app.use('/api/v1/estatusgrupos', estatusgruposRouter);
+app.use('/api/v1/grupos', gruposRouter);
+app.use('/api/v1/inscripcionesgrupos', inscripcionesgruposRouter);
+app.use('/api/v1/periodos', periodosRouter);
+app.use('/api/v1/periodosgrupos', periodosgruposRouter);
+app.use('/api/v1/tiposgrupos', tiposgruposRouter);
 
-// api principal para las encuestas
-app.use('/api/v1/encuestas', encuestaRouter);
+// ********************************************************************************************
+// api para las encuestas
+app.use('/api/v1/detalleusuariosencuestas', detalleusuariosencuestasRouter);
+app.use('/api/v1/encuestas', encuestasRouter);
+app.use('/api/v1/encuestaspreguntasrespuestas', encuestaspreguntasrespuestasRouter);
+app.use('/api/v1/interpretacionresultados', interpretacionresultadosRouter);
+app.use('/api/v1/preguntas', preguntasRouter);
+app.use('/api/v1/respuestas', respuestasRouter);
+app.use('/api/v1/tipoencuestas', tipoencuestasRouter);
+app.use('/api/v1/usuariosencuestas', usuariosencuestasRouter);
 
+// ********************************************************************************************
 // api principal para los proveedores
-app.use('/api/v1/proveedores', proveedorRouter);
+app.use('/api/v1/estatuspublicaciones', estatuspublicacionesRouter);
+app.use('/api/v1/proveedoresconservicios', proveedoresconserviciosRouter);
+app.use('/api/v1/publicaciones', publicacionesRouter);
+app.use('/api/v1/serviciosproveedores', serviciosproveedoresRouter);
+app.use('/api/v1/tiposserviciosproveedores', tiposserviciosproveedoresRouter);
+
+
+
+
+
+
+
+
+
+
 
 
 // ********************************************************************************************

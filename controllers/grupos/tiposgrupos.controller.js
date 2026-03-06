@@ -51,7 +51,7 @@ export const tiposgruposGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /tiposgrupos/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const tipogrupoGetById = async (req, res, next) => {
+export const tiposgrupoGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -75,7 +75,7 @@ export const tipogrupoGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /tiposgrupos  →  crear nuevo tipo de grupo
 // ─────────────────────────────────────────────────────────────────────────────
-export const tipogrupoPost = async (req, res, next) => {
+export const tiposgrupoPost = async (req, res, next) => {
     try {
         const { tipo_grupo } = req.body;
 
@@ -122,7 +122,7 @@ export const tipogrupoPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /tiposgrupos/:id  →  reemplazo total del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const tipogrupoPut = async (req, res, next) => {
+export const tiposgrupoPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -191,7 +191,7 @@ export const tipogrupoPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /tiposgrupos/:id  →  actualización parcial del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const tipogrupoPatch = async (req, res, next) => {
+export const tiposgrupoPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -263,7 +263,7 @@ export const tipogrupoPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /tiposgrupos/:id  →  eliminar registro por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const tipogrupoDelete = async (req, res, next) => {
+export const tiposgrupoDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {

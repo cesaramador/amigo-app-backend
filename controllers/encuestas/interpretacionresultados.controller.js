@@ -79,7 +79,7 @@ export const interpretacionresultadosGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /interpretacionresultados/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const interpretacionresultadosGetById = async (req, res, next) => {
+export const interpretacionresultadoGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -108,7 +108,7 @@ export const interpretacionresultadosGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /interpretacionresultados  →  crear nuevo registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const interpretacionresultadosPost = async (req, res, next) => {
+export const interpretacionresultadoPost = async (req, res, next) => {
     try {
         const { id_encuesta, puntuacion, gravedad, acciones_propuestas } = req.body;
 
@@ -200,7 +200,7 @@ export const interpretacionresultadosPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /interpretacionresultados/:id  →  reemplazo total del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const interpretacionresultadosPut = async (req, res, next) => {
+export const interpretacionresultadoPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -313,7 +313,7 @@ export const interpretacionresultadosPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /interpretacionresultados/:id  →  actualización parcial del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const interpretacionresultadosPatch = async (req, res, next) => {
+export const interpretacionresultadoPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -449,7 +449,7 @@ export const interpretacionresultadosPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /interpretacionresultados/:id  →  eliminar registro por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const interpretacionresultadosDelete = async (req, res, next) => {
+export const interpretacionresultadoDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {

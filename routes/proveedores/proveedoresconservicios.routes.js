@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import {
     proveedoresconserviciosGet,
-    proveedoresconserviciosGetById,
-    proveedoresconserviciosPost,
-    proveedoresconserviciosPut,
-    proveedoresconserviciosPatch,
-    proveedoresconserviciosDelete
+    proveedoresconservicioGetById,
+    proveedoresconservicioPost,
+    proveedoresconservicioPut,
+    proveedoresconservicioPatch,
+    proveedoresconservicioDelete
 } from '../../controllers/proveedores/proveedoresconservicios.controller.js';
 import autorizaAcceso from '../../middleware/auth.middleware.js';
 
@@ -17,22 +17,22 @@ proveedoresconserviciosRouter.get('/', autorizaAcceso, proveedoresconserviciosGe
 
 // path : /api/v1/proveedoresconservicios/:id (GET)
 // leer un proveedor con servicio por id
-proveedoresconserviciosRouter.get('/:id', autorizaAcceso, proveedoresconserviciosGetById);
+proveedoresconserviciosRouter.get('/:id', autorizaAcceso, proveedoresconservicioGetById);
 
 // path : /api/v1/proveedoresconservicios (POST)
 // crear un nuevo proveedor con servicio
-proveedoresconserviciosRouter.post('/', autorizaAcceso, proveedoresconserviciosPost);
+proveedoresconserviciosRouter.post('/', autorizaAcceso, proveedoresconservicioPost);
 
 // path : /api/v1/proveedoresconservicios/:id (PUT)
 // actualizar un proveedor con servicio por id
-proveedoresconserviciosRouter.put('/:id', autorizaAcceso, proveedoresconserviciosPut);
+proveedoresconserviciosRouter.put('/:id', autorizaAcceso, proveedoresconservicioPut);
 
 // path : /api/v1/proveedoresconservicios/:id (PATCH)
 // actualizar parcialmente un proveedor con servicio por id
-proveedoresconserviciosRouter.patch('/:id', autorizaAcceso, proveedoresconserviciosPatch);
+proveedoresconserviciosRouter.patch('/:id', autorizaAcceso, proveedoresconservicioPatch);
 
 // path : /api/v1/proveedoresconservicios/:id (DELETE)
 // eliminar un proveedor con servicio por id
-proveedoresconserviciosRouter.delete('/:id', autorizaAcceso, proveedoresconserviciosDelete);
+proveedoresconserviciosRouter.delete('/:id', autorizaAcceso, proveedoresconservicioDelete);
 
 export default proveedoresconserviciosRouter;

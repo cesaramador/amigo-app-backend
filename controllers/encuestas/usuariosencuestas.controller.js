@@ -109,7 +109,7 @@ export const usuariosencuestasGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /usuariosencuestas/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const usuariosencuestasGetById = async (req, res, next) => {
+export const usuariosencuestaGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -139,7 +139,7 @@ export const usuariosencuestasGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /usuariosencuestas  →  crear nuevo registro de usuario-encuesta
 // ─────────────────────────────────────────────────────────────────────────────
-export const usuariosencuestasPost = async (req, res, next) => {
+export const usuariosencuestaPost = async (req, res, next) => {
     try {
         const { id_usuario, id_encuesta, fecha_elaboracion_encuesta } = req.body;
 
@@ -207,7 +207,7 @@ export const usuariosencuestasPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /usuariosencuestas/:id  →  reemplazo total del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const usuariosencuestasPut = async (req, res, next) => {
+export const usuariosencuestaPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -298,7 +298,7 @@ export const usuariosencuestasPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /usuariosencuestas/:id  →  actualización parcial del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const usuariosencuestasPatch = async (req, res, next) => {
+export const usuariosencuestaPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -409,7 +409,7 @@ export const usuariosencuestasPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /usuariosencuestas/:id  →  eliminar registro por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const usuariosencuestasDelete = async (req, res, next) => {
+export const usuariosencuestaDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {

@@ -70,7 +70,7 @@ export const respuestasGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /respuestas/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const respuestasGetById = async (req, res, next) => {
+export const respuestaGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -100,7 +100,7 @@ export const respuestasGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /respuestas  →  crear nueva respuesta
 // ─────────────────────────────────────────────────────────────────────────────
-export const respuestasPost = async (req, res, next) => {
+export const respuestaPost = async (req, res, next) => {
     try {
         const { respuesta, id_estatus_enc_preg_resp } = req.body;
 
@@ -162,7 +162,7 @@ export const respuestasPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /respuestas/:id  →  reemplazo total del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const respuestasPut = async (req, res, next) => {
+export const respuestaPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -250,7 +250,7 @@ export const respuestasPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /respuestas/:id  →  actualización parcial del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const respuestasPatch = async (req, res, next) => {
+export const respuestaPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -349,7 +349,7 @@ export const respuestasPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /respuestas/:id  →  eliminar registro por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const respuestasDelete = async (req, res, next) => {
+export const respuestaDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {

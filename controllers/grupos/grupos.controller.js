@@ -63,7 +63,7 @@ export const gruposGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /grupos/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const gruposGetById = async (req, res, next) => {
+export const grupoGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {

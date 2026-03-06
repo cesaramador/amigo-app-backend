@@ -79,7 +79,7 @@ export const periodosgruposGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /periodosgrupos/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const periodogrupoGetById = async (req, res, next) => {
+export const periodosgrupoGetById = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
         if (id === null) {
@@ -103,7 +103,7 @@ export const periodogrupoGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /periodosgrupos  →  crear nuevo periodo de grupo
 // ─────────────────────────────────────────────────────────────────────────────
-export const periodogrupoPost = async (req, res, next) => {
+export const periodosgrupoPost = async (req, res, next) => {
     try {
         const { id_grupo, id_periodo, id_estatus_grupo, id_responsable_grupo, hora_inicio, lugar_imparticion } = req.body;
 
@@ -196,7 +196,7 @@ export const periodogrupoPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /periodosgrupos/:id  →  reemplazo total del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const periodogrupoPut = async (req, res, next) => {
+export const periodosgrupoPut = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
         if (id === null) {
@@ -308,7 +308,7 @@ export const periodogrupoPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /periodosgrupos/:id  →  actualización parcial del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const periodogrupoPatch = async (req, res, next) => {
+export const periodosgrupoPatch = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
         if (id === null) {
@@ -454,7 +454,7 @@ export const periodogrupoPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /periodosgrupos/:id  →  eliminar registro por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const periodogrupoDelete = async (req, res, next) => {
+export const periodosgrupoDelete = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
         if (id === null) {

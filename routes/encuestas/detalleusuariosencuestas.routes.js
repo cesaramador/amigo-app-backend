@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import {
     detalleusuariosencuestasGet,
-    detalleusuariosencuestaGetById,
-    detalleusuariosencuestaPost,
-    detalleusuariosencuestaPut,
-    detalleusuariosencuestaPatch,
-    detalleusuariosencuestaDelete
+    detalleusuarioencuestaGetById,
+    detalleusuarioencuestaPost,
+    detalleusuarioencuestaPut,
+    detalleusuarioencuestaPatch,
+    detalleusuarioencuestaDelete
 } from '../../controllers/encuestas/detalleusuariosencuestas.controller.js';
 import autorizaAcceso from '../../middleware/auth.middleware.js';
 
@@ -17,22 +17,22 @@ detalleusuariosencuestasRouter.get('/', autorizaAcceso, detalleusuariosencuestas
 
 // path : /api/v1/detalleusuariosencuestas/:id (GET)
 // leer una publicacion por id
-detalleusuariosencuestasRouter.get('/:id', autorizaAcceso, detalleusuariosencuestaGetById);
+detalleusuariosencuestasRouter.get('/:id', autorizaAcceso, detalleusuarioencuestaGetById);
 
 // path : /api/v1/detalleusuariosencuestas (POST)
 // crear una nueva publicacion
-detalleusuariosencuestasRouter.post('/', autorizaAcceso, detalleusuariosencuestaPost);
+detalleusuariosencuestasRouter.post('/', autorizaAcceso, detalleusuarioencuestaPost);
 
 // path : /api/v1/detalleusuariosencuestas/:id (PUT)
 // actualizar una publicacion por id
-detalleusuariosencuestasRouter.put('/:id', autorizaAcceso, detalleusuariosencuestaPut);
+detalleusuariosencuestasRouter.put('/:id', autorizaAcceso, detalleusuarioencuestaPut);
 
 // path : /api/v1/detalleusuariosencuestas/:id (PATCH)
 // actualizar parcialmente una publicacion por id
-detalleusuariosencuestasRouter.patch('/:id', autorizaAcceso, detalleusuariosencuestaPatch);
+detalleusuariosencuestasRouter.patch('/:id', autorizaAcceso, detalleusuarioencuestaPatch);
 
 // path : /api/v1/detalleusuariosencuestas/:id (DELETE)
 // eliminar una publicacion por id
-detalleusuariosencuestasRouter.delete('/:id', autorizaAcceso, detalleusuariosencuestaDelete);
+detalleusuariosencuestasRouter.delete('/:id', autorizaAcceso, detalleusuarioencuestaDelete);
 
 export default detalleusuariosencuestasRouter;

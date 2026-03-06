@@ -77,7 +77,7 @@ export const proveedoresconserviciosGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /proveedoresconservicios/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const proveedoresconserviciosGetById = async (req, res, next) => {
+export const proveedoresconservicioGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -107,7 +107,7 @@ export const proveedoresconserviciosGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /proveedoresconservicios  →  crear nuevo registro proveedor-servicio
 // ─────────────────────────────────────────────────────────────────────────────
-export const proveedoresconserviciosPost = async (req, res, next) => {
+export const proveedoresconservicioPost = async (req, res, next) => {
     try {
         const { id_usuario, id_servicio_proveedor } = req.body;
 
@@ -165,7 +165,7 @@ export const proveedoresconserviciosPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /proveedoresconservicios/:id  →  reemplazo total del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const proveedoresconserviciosPut = async (req, res, next) => {
+export const proveedoresconservicioPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -247,7 +247,7 @@ export const proveedoresconserviciosPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /proveedoresconservicios/:id  →  actualización parcial del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const proveedoresconserviciosPatch = async (req, res, next) => {
+export const proveedoresconservicioPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -342,7 +342,7 @@ export const proveedoresconserviciosPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /proveedoresconservicios/:id  →  eliminar registro por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const proveedoresconserviciosDelete = async (req, res, next) => {
+export const proveedoresconservicioDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {

@@ -1,19 +1,19 @@
 import { Router } from 'express';
 import {
-    asistenciaGet,
+    asistenciasGet,
     asistenciaGetById,
     asistenciaPost,
     asistenciaPut,
     asistenciaPatch,
     asistenciaDelete
-} from '../../controllers/grupos/asistencia.controller.js';
+} from '../../controllers/grupos/asistencias.controller.js';
 import autorizaAcceso from '../../middleware/auth.middleware.js';
 
 const asistenciaRouter = Router();
 
 // path : /api/v1/asistencia (GET)
 // leer todas las asistencias
-asistenciaRouter.get('/', autorizaAcceso, asistenciaGet);
+asistenciaRouter.get('/', autorizaAcceso, asistenciasGet);
 
 // path : /api/v1/asistencia/:id (GET)
 // leer una asistencia por id

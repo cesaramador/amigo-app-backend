@@ -54,7 +54,7 @@ export const estatuspublicacionesGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /estatuspublicaciones/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatuspublicacionesGetById = async (req, res, next) => {
+export const estatuspublicacionGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -84,7 +84,7 @@ export const estatuspublicacionesGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /estatuspublicaciones  →  crear nuevo estatus de publicación
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatuspublicacionesPost = async (req, res, next) => {
+export const estatuspublicacionPost = async (req, res, next) => {
     try {
         const { estatus_publicacion } = req.body;
 
@@ -131,7 +131,7 @@ export const estatuspublicacionesPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /estatuspublicaciones/:id  →  reemplazo total del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatuspublicacionesPut = async (req, res, next) => {
+export const estatuspublicacionPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -202,7 +202,7 @@ export const estatuspublicacionesPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /estatuspublicaciones/:id  →  actualización parcial del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatuspublicacionesPatch = async (req, res, next) => {
+export const estatuspublicacionPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -282,7 +282,7 @@ export const estatuspublicacionesPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /estatuspublicaciones/:id  →  eliminar registro por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const estatuspublicacionesDelete = async (req, res, next) => {
+export const estatuspublicacionDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {

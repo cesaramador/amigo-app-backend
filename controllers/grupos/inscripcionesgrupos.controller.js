@@ -72,7 +72,7 @@ export const inscripcionesgruposGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /inscripcionesgrupos/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const inscripcionesgruposGetById = async (req, res, next) => {
+export const inscripcionesgrupoGetById = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
         if (id === null) {
@@ -96,7 +96,7 @@ export const inscripcionesgruposGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /inscripcionesgrupos  →  crear nueva inscripción
 // ─────────────────────────────────────────────────────────────────────────────
-export const inscripcionesgruposPost = async (req, res, next) => {
+export const inscripcionesgrupoPost = async (req, res, next) => {
     try {
         const { id_periodo_grupo, id_usuario_inscrito } = req.body;
 
@@ -141,7 +141,7 @@ export const inscripcionesgruposPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /inscripcionesgrupos/:id  →  reemplazo total del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const inscripciongrupoPut = async (req, res, next) => {
+export const inscripcionesgrupoPut = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
         if (id === null) {
@@ -205,7 +205,7 @@ export const inscripciongrupoPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /inscripcionesgrupos/:id  →  actualización parcial del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const inscripciongrupoPatch = async (req, res, next) => {
+export const inscripcionesgrupoPatch = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
         if (id === null) {
@@ -297,7 +297,7 @@ export const inscripciongrupoPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /inscripcionesgrupos/:id  →  eliminar registro por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const inscripciongrupoDelete = async (req, res, next) => {
+export const inscripcionesgrupoDelete = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
         if (id === null) {

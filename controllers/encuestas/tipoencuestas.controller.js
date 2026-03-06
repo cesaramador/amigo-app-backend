@@ -54,7 +54,7 @@ export const tipoencuestasGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /tipoencuestas/:id  →  registro único por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const tipoencuestasGetById = async (req, res, next) => {
+export const tipoencuestaGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -84,7 +84,7 @@ export const tipoencuestasGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /tipoencuestas  →  crear nuevo tipo de encuesta
 // ─────────────────────────────────────────────────────────────────────────────
-export const tipoencuestasPost = async (req, res, next) => {
+export const tipoencuestaPost = async (req, res, next) => {
     try {
         const { tipo_encuesta } = req.body;
 
@@ -131,7 +131,7 @@ export const tipoencuestasPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /tipoencuestas/:id  →  reemplazo total del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const tipoencuestasPut = async (req, res, next) => {
+export const tipoencuestaPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -202,7 +202,7 @@ export const tipoencuestasPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PATCH /tipoencuestas/:id  →  actualización parcial del registro
 // ─────────────────────────────────────────────────────────────────────────────
-export const tipoencuestasPatch = async (req, res, next) => {
+export const tipoencuestaPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {
@@ -282,7 +282,7 @@ export const tipoencuestasPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /tipoencuestas/:id  →  eliminar registro por PK
 // ─────────────────────────────────────────────────────────────────────────────
-export const tipoencuestasDelete = async (req, res, next) => {
+export const tipoencuestaDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
         if (!Number.isInteger(id) || id <= 0) {

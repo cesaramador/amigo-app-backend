@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import {
     encuestaspreguntasrespuestasGet,
-    encuestaspreguntasrespuestaGetById,
-    encuestaspreguntasrespuestaPost,
-    encuestaspreguntasrespuestaPut,
-    encuestaspreguntasrespuestaPatch,
-    encuestaspreguntasrespuestaDelete
+    encuestapreguntarespuestaGetById,
+    encuestapreguntarespuestaPost,
+    encuestapreguntarespuestaPut,
+    encuestapreguntarespuestaPatch,
+    encuestapreguntarespuestaDelete
 } from '../../controllers/encuestas/encuestaspreguntasrespuestas.controller.js';
 import autorizaAcceso from '../../middleware/auth.middleware.js';
 
@@ -17,22 +17,22 @@ encuestaspreguntasrespuestasRouter.get('/', autorizaAcceso, encuestaspreguntasre
 
 // path : /api/v1/encuestaspreguntasrespuestas/:id (GET)
 // leer una encuestaspreguntasrespuesta por id
-encuestaspreguntasrespuestasRouter.get('/:id', autorizaAcceso, encuestaspreguntasrespuestaGetById);
+encuestaspreguntasrespuestasRouter.get('/:id', autorizaAcceso, encuestapreguntarespuestaGetById);
 
 // path : /api/v1/encuestaspreguntasrespuestas (POST)
 // crear una nueva encuestaspreguntasrespuesta
-encuestaspreguntasrespuestasRouter.post('/', autorizaAcceso, encuestaspreguntasrespuestaPost);
+encuestaspreguntasrespuestasRouter.post('/', autorizaAcceso, encuestapreguntarespuestaPost);
 
 // path : /api/v1/encuestaspreguntasrespuestas/:id (PUT)
 // actualizar una encuestaspreguntasrespuesta por id
-encuestaspreguntasrespuestasRouter.put('/:id', autorizaAcceso, encuestaspreguntasrespuestaPut);
+encuestaspreguntasrespuestasRouter.put('/:id', autorizaAcceso, encuestapreguntarespuestaPut);
 
 // path : /api/v1/encuestaspreguntasrespuestas/:id (PATCH)
 // actualizar parcialmente una encuestaspreguntasrespuesta por id
-encuestaspreguntasrespuestasRouter.patch('/:id', autorizaAcceso, encuestaspreguntasrespuestaPatch);
+encuestaspreguntasrespuestasRouter.patch('/:id', autorizaAcceso, encuestapreguntarespuestaPatch);
 
 // path : /api/v1/encuestaspreguntasrespuestas/:id (DELETE)
 // eliminar una encuestaspreguntasrespuesta por id
-encuestaspreguntasrespuestasRouter.delete('/:id', autorizaAcceso, encuestaspreguntasrespuestaDelete);
+encuestaspreguntasrespuestasRouter.delete('/:id', autorizaAcceso, encuestapreguntarespuestaDelete);
 
 export default encuestaspreguntasrespuestasRouter;
