@@ -10,8 +10,7 @@ const Estados = sequelize.define('Estados', {
         allowNull: false
     },
     estado: {
-        type: DataTypes.STRING,
-        length: 100,
+        type: DataTypes.STRING(100),
         allowNull: false,
         unique: true
     }

@@ -11,8 +11,7 @@ const TiposUsuarios = sequelize.define('TiposUsuarios', {
         allowNull: false
     },
     tipo_usuario: {
-        type: DataTypes.STRING,
-        length: 50,
+        type: DataTypes.STRING(50),
         allowNull: false,
         unique: true
     }

@@ -10,8 +10,7 @@ const CategoriasViviendas = sequelize.define('CategoriasViviendas', {
         allowNull: false
     },
     categoria_vivienda: {
-        type: DataTypes.STRING,
-        length: 20,
+        type: DataTypes.STRING(20),
         allowNull: false,
         unique: true
     }

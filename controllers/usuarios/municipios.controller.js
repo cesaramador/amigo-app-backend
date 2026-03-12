@@ -3,198 +3,218 @@ import Estado from "../../models/usuarios/estados.model.js";
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
-// Leer todos los municipios
+// Helper: obtener longitud máxima del atributo desde el modelo
+const getMaxLength = (field) => {
+    const attrs = Municipio.rawAttributes || {};
+    // DataTypes.STRING(n) almacena n en type.options.length
+    return attrs[field]?.type?.options?.length ?? 100;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/municipios
+// Obtener todos los municipios (con paginación, búsqueda y orden)
+// ─────────────────────────────────────────────────────────────────────────────
 export const municipiosGet = async (req, res, next) => {
     try {
-        // Paginación
-        const page = Math.max(1, Number(req.query.page) || 1);
+        // Paginación segura
+        const page  = Math.max(1, Number(req.query.page)  || 1);
         const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
         const offset = (page - 1) * limit;
 
-        // Búsqueda por nombre
+        // Búsqueda por nombre de municipio
         const q = (req.query.q || '').trim();
         const where = q ? { municipio: { [Op.like]: `%${q}%` } } : {};
 
-        // Orden seguro
-        const [sortField = 'id_municipio', sortOrderRaw = 'asc'] = (req.query.sort || 'id_municipio:asc').split(':');
-        const allowedSortFields = ['id_municipio', 'municipio'];
-        const sortFieldSafe = allowedSortFields.includes(sortField) ? sortField : 'id_municipio';
-        const sortOrder = (String(sortOrderRaw).toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+        // Filtro adicional por estado
+        if (req.query.id_estado) {
+            const idEstadoFiltro = Number(req.query.id_estado);
+            if (!Number.isInteger(idEstadoFiltro) || idEstadoFiltro <= 0) {
+                return res.status(400).json({ success: false, message: 'id_estado de filtro inválido.' });
+            }
+            where.id_estado = idEstadoFiltro;
+        }
 
-        // Ejecutar consulta con transacción
-        const municipios = await sequelize.transaction(async (t) => {
-            return await Municipio.findAndCountAll({
-                where,
-                limit,
-                offset,
-                order: [[sortFieldSafe, sortOrder]],
-                transaction: t
-            });
+        // Orden seguro
+        const allowedSortFields = ['id_municipio', 'municipio', 'id_estado', 'num_municipio'];
+        const [sortField = 'id_municipio', sortOrderRaw = 'asc'] =
+            (req.query.sort || 'id_municipio:asc').split(':');
+        const sortFieldSafe = allowedSortFields.includes(sortField) ? sortField : 'id_municipio';
+        const sortOrder = sortOrderRaw.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+
+        const result = await Municipio.findAndCountAll({
+            where,
+            limit,
+            offset,
+            order: [[sortFieldSafe, sortOrder]]
         });
 
-        const total = municipios.count;
+        const total = result.count;
         const pages = Math.ceil(total / limit) || 1;
 
         return res.status(200).json({
             success: true,
-            message: 'Municipios obtenidos exitosamente',
-            meta: {
-                total,
-                page,
-                pages,
-                limit,
-                sort: `${sortFieldSafe}:${sortOrder}`
-            },
-            data: municipios.rows
+            meta: { total, page, pages, limit, sort: `${sortFieldSafe}:${sortOrder}` },
+            data: result.rows
         });
     } catch (error) {
         console.error('Error en municipiosGet:', error.message || error);
         return next(error);
     }
-}
+};
 
-// Leer un municipio por id
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/municipios/:id
+// Obtener un municipio por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const municipioGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ 
-                success: false,
-                message: 'ID inválido' 
-            });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
-        // Buscar municipio con transacción
-        const municipio = await sequelize.transaction(async (t) => {
-            return await Municipio.findByPk(id, {
-                transaction: t
-            });
-        });
+        const municipio = await Municipio.findByPk(id);
 
         if (!municipio) {
-            return res.status(404).json({ 
-                success: false,
-                message: 'Municipio no encontrado' 
-            });
+            return res.status(404).json({ success: false, message: 'Municipio no encontrado.' });
         }
 
-        return res.status(200).json({
-            success: true,
-            message: 'Municipio obtenido exitosamente',
-            data: municipio
-        });
+        return res.status(200).json({ success: true, data: municipio });
     } catch (error) {
-        console.error('Error en municipiosGetById:', error.message || error);
+        console.error('Error en municipioGetById:', error.message || error);
         return next(error);
     }
-}
+};
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/v1/municipios
 // Crear un nuevo municipio
+// ─────────────────────────────────────────────────────────────────────────────
 export const municipioPost = async (req, res, next) => {
     try {
         const { id_estado, num_municipio, municipio } = req.body;
 
-        // validaciones básicas
-        if (!Number.isInteger(Number(id_estado)) || Number(id_estado) <= 0) {
-            return res.status(400).json({ success: false, message: 'id_estado inválido' });
+        // Validaciones básicas de presencia y tipo
+        const idEstadoNum = Number(id_estado);
+        if (!Number.isInteger(idEstadoNum) || idEstadoNum <= 0) {
+            return res.status(400).json({ success: false, message: 'El campo id_estado es obligatorio y debe ser un entero positivo.' });
         }
-        if (!Number.isInteger(Number(num_municipio)) || Number(num_municipio) <= 0) {
-            return res.status(400).json({ success: false, message: 'num_municipio inválido' });
+        const numMunicipioNum = Number(num_municipio);
+        if (!Number.isInteger(numMunicipioNum) || numMunicipioNum <= 0) {
+            return res.status(400).json({ success: false, message: 'El campo num_municipio es obligatorio y debe ser un entero positivo.' });
         }
         if (!municipio || typeof municipio !== 'string' || municipio.trim() === '') {
-            return res.status(400).json({ success: false, message: 'municipio es obligatorio' });
+            return res.status(400).json({ success: false, message: 'El campo municipio es obligatorio y debe ser texto.' });
         }
 
-        const attrs = Municipio.rawAttributes || {};
-        const maxLen = attrs.municipio?.type?.options?.length ?? attrs.municipio?._length ?? 100;
-        if (String(municipio).trim().length > maxLen) {
-            return res.status(400).json({ success: false, message: `municipio supera ${maxLen} caracteres` });
+        const municipioTrim = municipio.trim();
+
+        // Validación de longitud máxima
+        const maxLen = getMaxLength('municipio');
+        if (municipioTrim.length > maxLen) {
+            return res.status(400).json({ success: false, message: `El campo municipio no puede exceder ${maxLen} caracteres.` });
         }
 
-        // verificar duplicados: mismo id_estado + num_municipio o mismo nombre en el mismo estado
-        const conflict = await Municipio.findOne({
-            where: {
-                id_estado: Number(id_estado),
-                [Op.or]: [
-                    { num_municipio: Number(num_municipio) },
-                    { municipio: String(municipio).trim() }
-                ]
-            }
-        });
-        if (conflict) {
-            return res.status(409).json({ success: false, message: 'Municipio duplicado (número o nombre ya existe en el estado)' });
-        }
-
-        // crear municipio dentro de transacción
+        // Verificación de FK + duplicados + creación dentro de la misma transacción
         const nuevo = await sequelize.transaction(async (t) => {
-            const created = await Municipio.create({
-                id_estado: Number(id_estado),
-                num_municipio: Number(num_municipio),
-                municipio: String(municipio).trim()
-            }, { transaction: t });
+            // Verificar que el estado exista
+            const estadoExist = await Estado.findByPk(idEstadoNum, { transaction: t });
+            if (!estadoExist) {
+                const err = new Error('El id_estado proporcionado no existe.');
+                err.statusCode = 404;
+                throw err;
+            }
 
-            return created;
+            // Verificar duplicado: mismo estado con igual num_municipio o igual nombre
+            const conflict = await Municipio.findOne({
+                where: {
+                    id_estado: idEstadoNum,
+                    [Op.or]: [
+                        { num_municipio: numMunicipioNum },
+                        { municipio: municipioTrim }
+                    ]
+                },
+                transaction: t
+            });
+            if (conflict) {
+                const err = new Error('El num_municipio o el nombre del municipio ya existe en ese estado.');
+                err.statusCode = 409;
+                throw err;
+            }
+
+            return await Municipio.create({
+                id_estado: idEstadoNum,
+                num_municipio: numMunicipioNum,
+                municipio: municipioTrim
+            }, { transaction: t });
         });
 
-        const payloadOut = nuevo.get({ plain: true });
-        return res.status(201).json({ success: true, message: 'Municipio creado exitosamente', data: payloadOut });
+        return res.status(201).json({
+            success: true,
+            message: 'Municipio creado exitosamente.',
+            data: nuevo.get({ plain: true })
+        });
     } catch (error) {
-        console.error('Error en municipiosPost:', error.message || error);
+        if (error.statusCode === 404) {
+            return res.status(404).json({ success: false, message: error.message });
+        }
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
+        }
+        console.error('Error en municipioPost:', error.message || error);
         return next(error);
     }
-}
+};
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/v1/municipios/:id
+// Reemplazar completamente un municipio por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const municipioPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
         const { id_estado, num_municipio, municipio } = req.body;
 
-        // En PUT solemos requerir los campos principales
-        if (
-            id_estado === undefined ||
-            num_municipio === undefined ||
-            municipio === undefined
-        ) {
+        // PUT requiere todos los campos
+        if (id_estado === undefined || num_municipio === undefined || municipio === undefined) {
             return res.status(400).json({
                 success: false,
-                message: 'Se requieren id_estado, num_municipio y municipio'
+                message: 'Se requieren los campos: id_estado, num_municipio y municipio.'
             });
         }
 
-        // Validaciones básicas de tipos/valores
-        const idEstadoNum = Number(id_estado);
+        const idEstadoNum    = Number(id_estado);
         const numMunicipioNum = Number(num_municipio);
+
         if (!Number.isInteger(idEstadoNum) || idEstadoNum <= 0) {
-            return res.status(400).json({ success: false, message: 'id_estado inválido' });
+            return res.status(400).json({ success: false, message: 'El campo id_estado debe ser un entero positivo.' });
         }
         if (!Number.isInteger(numMunicipioNum) || numMunicipioNum <= 0) {
-            return res.status(400).json({ success: false, message: 'num_municipio inválido' });
+            return res.status(400).json({ success: false, message: 'El campo num_municipio debe ser un entero positivo.' });
         }
         if (typeof municipio !== 'string' || municipio.trim() === '') {
-            return res.status(400).json({ success: false, message: 'municipio inválido' });
+            return res.status(400).json({ success: false, message: 'El campo municipio debe ser texto no vacío.' });
         }
+
         const municipioTrim = municipio.trim();
 
-        // extraer longitud desde el modelo si existe
-        const attrs = Municipio.rawAttributes || {};
-        const maxLength = attrs.municipio?.type?.options?.length ?? attrs.municipio?._length ?? 100;
+        const maxLength = getMaxLength('municipio');
         if (municipioTrim.length > maxLength) {
-            return res.status(400).json({ success: false, message: `municipio supera ${maxLength} caracteres` });
+            return res.status(400).json({ success: false, message: `El campo municipio no puede exceder ${maxLength} caracteres.` });
         }
 
-        // Ejecutar actualización dentro de transacción
         const updated = await sequelize.transaction(async (t) => {
             const record = await Municipio.findByPk(id, { transaction: t });
             if (!record) return null;
 
-            // Verificar existencia del estado nuevo
+            // Verificar que el estado exista
             const estadoExist = await Estado.findByPk(idEstadoNum, { transaction: t });
             if (!estadoExist) {
-                const err = new Error('id_estado no existe');
+                const err = new Error('El id_estado proporcionado no existe.');
                 err.statusCode = 404;
                 throw err;
             }
@@ -212,28 +232,27 @@ export const municipioPut = async (req, res, next) => {
                 transaction: t
             });
             if (conflict) {
-                const err = new Error('Conflicto: num_municipio o municipio ya existe en el estado');
+                const err = new Error('El num_municipio o el nombre del municipio ya existe en ese estado.');
                 err.statusCode = 409;
                 throw err;
             }
 
-            // Actualizar campos
             await record.update({
                 id_estado: idEstadoNum,
                 num_municipio: numMunicipioNum,
                 municipio: municipioTrim
             }, { transaction: t });
 
-            return await Municipio.findByPk(id, { transaction: t });
+            return record;
         });
 
-        if (!updated) {
-            return res.status(404).json({ success: false, message: 'Municipio no encontrado' });
+        if (updated === null) {
+            return res.status(404).json({ success: false, message: 'Municipio no encontrado.' });
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Municipio actualizado exitosamente',
+            message: 'Municipio actualizado exitosamente.',
             data: updated
         });
     } catch (error) {
@@ -243,56 +262,67 @@ export const municipioPut = async (req, res, next) => {
         if (error.statusCode === 409) {
             return res.status(409).json({ success: false, message: error.message });
         }
-        console.error('Error en municipiosPut:', error.message || error);
+        console.error('Error en municipioPut:', error.message || error);
         return next(error);
     }
-}
+};
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/v1/municipios/:id
+// Actualizar parcialmente un municipio por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const municipioPatch = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
-        // Campos permitidos en PATCH
         const { id_estado, num_municipio, municipio } = req.body;
+
+        // Al menos un campo debe estar presente
         const hasAny = id_estado !== undefined || num_municipio !== undefined || municipio !== undefined;
         if (!hasAny) {
-            return res.status(400).json({ success: false, message: 'No hay campos para actualizar' });
+            return res.status(400).json({ success: false, message: 'Se debe proporcionar al menos un campo para actualizar.' });
         }
 
-        // Validaciones parciales
-        if (id_estado !== undefined && (!Number.isInteger(Number(id_estado)) || Number(id_estado) <= 0)) {
-            return res.status(400).json({ success: false, message: 'id_estado inválido' });
+        // Validaciones parciales de tipo
+        if (id_estado !== undefined) {
+            const v = Number(id_estado);
+            if (!Number.isInteger(v) || v <= 0) {
+                return res.status(400).json({ success: false, message: 'El campo id_estado debe ser un entero positivo.' });
+            }
         }
-        if (num_municipio !== undefined && (!Number.isInteger(Number(num_municipio)) || Number(num_municipio) <= 0)) {
-            return res.status(400).json({ success: false, message: 'num_municipio inválido' });
+        if (num_municipio !== undefined) {
+            const v = Number(num_municipio);
+            if (!Number.isInteger(v) || v <= 0) {
+                return res.status(400).json({ success: false, message: 'El campo num_municipio debe ser un entero positivo.' });
+            }
         }
-        if (municipio !== undefined && (typeof municipio !== 'string' || municipio.trim() === '')) {
-            return res.status(400).json({ success: false, message: 'municipio inválido' });
-        }
-
-        const attrs = Municipio.rawAttributes || {};
-        const maxLength = attrs.municipio?.type?.options?.length ?? attrs.municipio?._length ?? 100;
-        if (municipio !== undefined && municipio.trim().length > maxLength) {
-            return res.status(400).json({ success: false, message: `municipio supera ${maxLength} caracteres` });
+        if (municipio !== undefined) {
+            if (typeof municipio !== 'string' || municipio.trim() === '') {
+                return res.status(400).json({ success: false, message: 'El campo municipio debe ser texto no vacío.' });
+            }
+            const maxLength = getMaxLength('municipio');
+            if (municipio.trim().length > maxLength) {
+                return res.status(400).json({ success: false, message: `El campo municipio no puede exceder ${maxLength} caracteres.` });
+            }
         }
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await Municipio.findByPk(id, { transaction: t });
             if (!record) return null;
 
-            // Determinar el id_estado objetivo (si no se provee, usar el actual)
-            const targetEstado = id_estado !== undefined ? Number(id_estado) : record.id_estado;
-            const targetNum = num_municipio !== undefined ? Number(num_municipio) : record.num_municipio;
-            const targetName = municipio !== undefined ? municipio.trim() : record.municipio;
+            // Valores objetivo: usar el enviado o mantener el actual
+            const targetEstado = id_estado     !== undefined ? Number(id_estado)     : record.id_estado;
+            const targetNum    = num_municipio  !== undefined ? Number(num_municipio)  : record.num_municipio;
+            const targetName   = municipio      !== undefined ? municipio.trim()       : record.municipio;
 
             // Si se cambia id_estado, verificar que exista
             if (id_estado !== undefined) {
                 const estadoExist = await Estado.findByPk(targetEstado, { transaction: t });
                 if (!estadoExist) {
-                    const err = new Error('id_estado no existe');
+                    const err = new Error('El id_estado proporcionado no existe.');
                     err.statusCode = 404;
                     throw err;
                 }
@@ -311,41 +341,51 @@ export const municipioPatch = async (req, res, next) => {
                 transaction: t
             });
             if (conflict) {
-                const err = new Error('Conflicto: num_municipio o municipio ya existe en el estado');
+                const err = new Error('El num_municipio o el nombre del municipio ya existe en ese estado.');
                 err.statusCode = 409;
                 throw err;
             }
 
-            // Construir payload de actualización
+            // Construir payload solo con los campos enviados
             const payload = {};
-            if (id_estado !== undefined) payload.id_estado = targetEstado;
-            if (num_municipio !== undefined) payload.num_municipio = targetNum;
-            if (municipio !== undefined) payload.municipio = targetName;
+            if (id_estado     !== undefined) payload.id_estado     = targetEstado;
+            if (num_municipio !== undefined) payload.num_municipio  = targetNum;
+            if (municipio     !== undefined) payload.municipio      = targetName;
 
             await record.update(payload, { transaction: t });
-
-            return await Municipio.findByPk(id, { transaction: t });
+            return record;
         });
 
         if (updated === null) {
-            return res.status(404).json({ success: false, message: 'Municipio no encontrado' });
+            return res.status(404).json({ success: false, message: 'Municipio no encontrado.' });
         }
 
-        return res.status(200).json({ success: true, message: 'Municipio actualizado parcialmente', data: updated });
+        return res.status(200).json({
+            success: true,
+            message: 'Municipio actualizado parcialmente.',
+            data: updated
+        });
     } catch (error) {
-        if (error.statusCode === 404) return res.status(404).json({ success: false, message: error.message });
-        if (error.statusCode === 409) return res.status(409).json({ success: false, message: error.message });
-        console.error('Error en municipiosPatch:', error.message || error);
+        if (error.statusCode === 404) {
+            return res.status(404).json({ success: false, message: error.message });
+        }
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
+        }
+        console.error('Error en municipioPatch:', error.message || error);
         return next(error);
     }
-}
+};
 
-// Eliminar un genero por id
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/v1/municipios/:id
+// Eliminar un municipio por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const municipioDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
         const deleted = await sequelize.transaction(async (t) => {
@@ -358,22 +398,26 @@ export const municipioDelete = async (req, res, next) => {
         });
 
         if (deleted === null) {
-            return res.status(404).json({ success: false, message: 'Municipio no encontrado' });
+            return res.status(404).json({ success: false, message: 'Municipio no encontrado.' });
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Municipio eliminado correctamente',
+            message: 'Municipio eliminado correctamente.',
             data: deleted
         });
     } catch (error) {
-        // Manejo específico de FK constraint
-        if (error.name === 'SequelizeForeignKeyConstraintError' || /foreign key|referenc/i.test(error.message || '')) {
+        // Manejo específico de violación de FK
+        if (
+            error.name === 'SequelizeForeignKeyConstraintError' ||
+            /foreign key|referenc/i.test(error.message || '')
+        ) {
             return res.status(409).json({
                 success: false,
-                message: 'No se puede eliminar el municipio: existen referencias en otras tablas'
+                message: 'No se puede eliminar el municipio: está referenciado en otros registros.'
             });
         }
+        console.error('Error en municipioDelete:', error.message || error);
         return next(error);
     }
-}
+};

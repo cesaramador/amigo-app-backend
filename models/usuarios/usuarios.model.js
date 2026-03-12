@@ -14,18 +14,15 @@ const Usuarios = sequelize.define('Usuarios', {
         allowNull: false
     },
     nombre: {
-        type: DataTypes.STRING,
-        length: 50,
-        allowNull: false,
+        type: DataTypes.STRING(50),
+        allowNull: false
     },
     ap_paterno: {
-        type: DataTypes.STRING,
-        length: 50,
+        type: DataTypes.STRING(50),
         allowNull: true
     },
     ap_materno: {
-        type: DataTypes.STRING,
-        length: 50,
+        type: DataTypes.STRING(50),
         allowNull: true
     },
     fecha_nacimiento: {
@@ -33,73 +30,63 @@ const Usuarios = sequelize.define('Usuarios', {
         allowNull: true
     },
     telefono_personal: {
-        type: DataTypes.STRING,
-        length: 10,
+        type: DataTypes.STRING(10),
         allowNull: false,
         unique: true
     },
     telefono_contacto: {
-        type: DataTypes.STRING,
-        length: 10,
+        type: DataTypes.STRING(10),
         allowNull: true
     },
     email: {
-        type: DataTypes.STRING,
-        length: 200,
+        type: DataTypes.STRING(200),
         allowNull: false,
         unique: true
     },
+    // Almacena hash bcrypt (~60 chars); se usa VARCHAR(255) para margen
     codigo: {
-        type: DataTypes.STRING,
-        length: 10,
+        type: DataTypes.STRING(255),
         allowNull: false
     },
     id_estado: {
         type: DataTypes.INTEGER,
-        allowNull: false    
+        allowNull: false
     },
     id_municipio: {
         type: DataTypes.INTEGER,
         allowNull: false
     },
     colonia: {
-        type: DataTypes.STRING,
-        length: 100,
+        type: DataTypes.STRING(100),
         allowNull: false
     },
     calle: {
-        type: DataTypes.STRING,
-        length: 100,
+        type: DataTypes.STRING(100),
         allowNull: false
     },
     numero_int: {
-        type: DataTypes.STRING,
-        length: 15,
+        type: DataTypes.STRING(15),
         allowNull: true
     },
     numero_ext: {
-        type: DataTypes.STRING,
-        length: 15,
+        type: DataTypes.STRING(15),
         allowNull: true
     },
     codigo_postal: {
-        type: DataTypes.STRING,
-        length: 5,
+        type: DataTypes.STRING(5),
         allowNull: false
     },
     razon_social: {
-        type: DataTypes.STRING,
-        length: 500,
+        type: DataTypes.STRING(500),
         allowNull: true
     },
     rfc: {
-        type: DataTypes.STRING,
-        length: 15,
+        type: DataTypes.STRING(15),
         allowNull: true
     },
     fecha_registro: {
         type: DataTypes.DATE,
-        allowNull: false    
+        allowNull: false
     },
     id_genero: {
         type: DataTypes.INTEGER,

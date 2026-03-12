@@ -11,21 +11,24 @@ const Municipios = sequelize.define('Municipios', {
     },
     id_estado: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: { model: 'Estados', key: 'id_estado' }
     },
     num_municipio: {
         type: DataTypes.INTEGER,
         allowNull: false
     },
     municipio: {
-        type: DataTypes.STRING,
-        length: 100,
-        allowNull: false,
+        type: DataTypes.STRING(100),
+        allowNull: false
     }
 },
 {
     timestamps: false,
-    tableName: 'Municipios'
+    tableName: 'Municipios',
+    indexes: [
+        { unique: true, fields: ['id_estado', 'num_municipio'] }
+    ]
 });
 
 export default Municipios;

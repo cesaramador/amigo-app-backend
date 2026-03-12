@@ -29,7 +29,13 @@ const autorizaAcceso = async (req, res, next) => {
         next();
 
     } catch (error) {
-        res.status(401).json({ message: 'Sin autorización', error: error.message || error });
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'El token ha expirado. Por favor inicia sesión de nuevo.' });
+        }
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: 'Token inválido o mal formado.' });
+        }
+        return res.status(401).json({ message: 'Sin autorización.', error: error.message || error });
     }
 }
 

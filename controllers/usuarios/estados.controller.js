@@ -2,11 +2,21 @@ import Estado from "../../models/usuarios/estados.model.js";
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
-// Leer todos los estados
+// Helper: obtener longitud máxima del atributo desde el modelo
+const getMaxLength = (field) => {
+    const attrs = Estado.rawAttributes || {};
+    // DataTypes.STRING(n) almacena n en type.options.length
+    return attrs[field]?.type?.options?.length ?? 100;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/estados
+// Obtener todos los estados (con paginación, búsqueda y orden)
+// ─────────────────────────────────────────────────────────────────────────────
 export const estadosGet = async (req, res, next) => {
     try {
-        // Paginación
-        const page = Math.max(1, Number(req.query.page) || 1);
+        // Paginación segura
+        const page  = Math.max(1, Number(req.query.page)  || 1);
         const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
         const offset = (page - 1) * limit;
 
@@ -15,269 +25,264 @@ export const estadosGet = async (req, res, next) => {
         const where = q ? { estado: { [Op.like]: `%${q}%` } } : {};
 
         // Orden seguro
-        const [sortField = 'id_estado', sortOrderRaw = 'asc'] = (req.query.sort || 'id_estado:asc').split(':');
         const allowedSortFields = ['id_estado', 'estado'];
+        const [sortField = 'id_estado', sortOrderRaw = 'asc'] =
+            (req.query.sort || 'id_estado:asc').split(':');
         const sortFieldSafe = allowedSortFields.includes(sortField) ? sortField : 'id_estado';
-        const sortOrder = (String(sortOrderRaw).toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+        const sortOrder = sortOrderRaw.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
 
-        // Ejecutar consulta con transacción
-        const estados = await sequelize.transaction(async (t) => {
-            return await Estado.findAndCountAll({
-                where,
-                limit,
-                offset,
-                order: [[sortFieldSafe, sortOrder]],
-                transaction: t
-            });
+        const result = await Estado.findAndCountAll({
+            where,
+            limit,
+            offset,
+            order: [[sortFieldSafe, sortOrder]]
         });
 
-        const total = estados.count;
+        const total = result.count;
         const pages = Math.ceil(total / limit) || 1;
 
         return res.status(200).json({
             success: true,
-            message: 'Estados obtenidos exitosamente',
-            meta: {
-                total,
-                page,
-                pages,
-                limit,
-                sort: `${sortFieldSafe}:${sortOrder}`
-            },
-            data: estados.rows
+            meta: { total, page, pages, limit, sort: `${sortFieldSafe}:${sortOrder}` },
+            data: result.rows
         });
     } catch (error) {
         console.error('Error en estadosGet:', error.message || error);
         return next(error);
     }
-}
+};
 
-// Leer un estado por id
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/estados/:id
+// Obtener un estado por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const estadoGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido'
-            });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
-        // Buscar estado con transacción
-        const estado = await sequelize.transaction(async (t) => {
-            return await Estado.findByPk(id, { transaction: t });
-        });
+        const estado = await Estado.findByPk(id);
 
         if (!estado) {
-            return res.status(404).json({
-                success: false,
-                message: 'Estado no encontrado'
-            });
+            return res.status(404).json({ success: false, message: 'Estado no encontrado.' });
         }
 
-        return res.status(200).json({
-            success: true,
-            message: 'Estado obtenido exitosamente',
-            data: estado
-        });
+        return res.status(200).json({ success: true, data: estado });
     } catch (error) {
-        console.error('Error en estadosGetById:', error.message || error);
+        console.error('Error en estadoGetById:', error.message || error);
         return next(error);
     }
-}
+};
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/v1/estados
 // Crear un nuevo estado
+// ─────────────────────────────────────────────────────────────────────────────
 export const estadoPost = async (req, res, next) => {
     try {
         const { estado } = req.body;
 
-        // Validar que el campo estado no esté vacío
-        if (!estado || (typeof estado === 'string' && estado.trim() === '')) {
+        // Validación de presencia y tipo
+        if (!estado || typeof estado !== 'string' || estado.trim() === '') {
+            return res.status(400).json({ success: false, message: 'El campo estado es obligatorio y debe ser texto.' });
+        }
+
+        const value = estado.trim();
+
+        // Validación de longitud máxima desde el modelo
+        const maxLength = getMaxLength('estado');
+        if (value.length > maxLength) {
             return res.status(400).json({
                 success: false,
-                message: 'El campo estado es obligatorio'
+                message: `El campo estado no puede exceder ${maxLength} caracteres.`
             });
         }
 
-        // Validar longitud máxima
-        const attrs = Estado.rawAttributes || {};
-        const maxLength = attrs.estado?.type?.options?.length ?? 100;
-        if (String(estado).length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estado no puede exceder ${maxLength} caracteres`
-            });
-        }
-
-        // Verificar si el estado ya existe
-        const existe = await Estado.findOne({ where: { estado: estado.trim() } });
-        if (existe) {
-            return res.status(409).json({
-                success: false,
-                message: 'El estado ya existe'
-            });
-        }
-
-        // Crear estado con transacción
+        // Verificación de duplicado + creación dentro de la misma transacción
         const nuevoEstado = await sequelize.transaction(async (t) => {
-            return await Estado.create(
-                { estado: estado.trim() },
-                { transaction: t }
-            );
+            const existe = await Estado.findOne({
+                where: { estado: value },
+                transaction: t
+            });
+            if (existe) {
+                const err = new Error('El estado ya existe.');
+                err.statusCode = 409;
+                throw err;
+            }
+
+            return await Estado.create({ estado: value }, { transaction: t });
         });
 
         return res.status(201).json({
             success: true,
-            message: 'Estado creado exitosamente',
+            message: 'Estado creado exitosamente.',
             data: nuevoEstado
         });
     } catch (error) {
-        console.error('Error en estadosPost:', error.message || error);
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
+        }
+        console.error('Error en estadoPost:', error.message || error);
         return next(error);
     }
-}
+};
 
-// Actualizar un estado por id
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/v1/estados/:id
+// Reemplazar completamente un estado por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const estadoPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido'
-            });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
         const { estado } = req.body;
 
-        // Validar que el campo estado no esté vacío
-        if (!estado || (typeof estado === 'string' && estado.trim() === '')) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo estado es obligatorio'
-            });
+        // Validación de presencia y tipo (una sola vez, sin duplicar)
+        if (!estado || typeof estado !== 'string' || estado.trim() === '') {
+            return res.status(400).json({ success: false, message: 'El campo estado es obligatorio y debe ser texto.' });
         }
 
-        if (typeof estado !== 'string' || estado.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Campo "estado" inválido' });
-        }
-
-        // Validar longitud máxima
-        const attrs = Estado.rawAttributes || {};
-        const maxLength = attrs.estado?.type?.options?.length ?? 100;
-        if (String(estado).length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estado no puede exceder ${maxLength} caracteres`
-            });
-        }
-
-        // Verificar que el estado existe
-        const estadoExistente = await Estado.findByPk(id);
-        if (!estadoExistente) {
-            return res.status(404).json({
-                success: false,
-                message: 'Estado no encontrado'
-            });
-        }
-
-        // Verificar si el nuevo estado ya existe (y no es el mismo)
-        if (estado.trim() !== estadoExistente.estado) {
-            const existe = await Estado.findOne({ where: { estado: estado.trim() } });
-            if (existe) {
-                return res.status(409).json({
-                    success: false,
-                    message: 'El estado ya existe'
-                });
-            }
-        }
-
-        // Actualizar género con transacción
-        const estadoActualizado = await sequelize.transaction(async (t) => {
-            await Estado.update(
-                { estado: estado.trim() },
-                { where: { id_estado: id }, transaction: t }
-            );
-            return await Estado.findByPk(id, { transaction: t });
-        });
-
-        return res.status(200).json({
-            success: true,
-            message: 'Estado actualizado exitosamente',
-            data: estadoActualizado
-        });
-    } catch (error) {
-        console.error('Error en estadosPut:', error.message || error);
-        return next(error);
-    }
-}
-
-// Actualizar un estado por id parcialmente
-export const estadoPatch = async (req, res, next) => {
-    try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
-        }
-
-        const { estado } = req.body;
-        if (typeof estado === 'undefined') {
-            return res.status(400).json({ success: false, message: 'Campo "estado" requerido' });
-        }
-        if (typeof estado !== 'string' || estado.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Campo "estado" inválido' });
-        }
         const value = estado.trim();
 
-        // extraer longitud desde el modelo si existe
-        const attrs = Estado.rawAttributes || {};
-        const maxLength = attrs.estado?.type?.options?.length ?? 100;
+        // Validación de longitud máxima desde el modelo
+        const maxLength = getMaxLength('estado');
         if (value.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo estado no puede exceder ${maxLength} caracteres` });
+            return res.status(400).json({
+                success: false,
+                message: `El campo estado no puede exceder ${maxLength} caracteres.`
+            });
         }
 
-        // Actualizar dentro de transacción (verifica existencia y unicidad)
-        const updated = await sequelize.transaction(async (t) => {
+        // Búsqueda, verificación de duplicado y actualización en una sola transacción
+        const estadoActualizado = await sequelize.transaction(async (t) => {
             const record = await Estado.findByPk(id, { transaction: t });
             if (!record) return null;
 
+            // Verificar duplicado solo si el valor cambia
             if (record.estado !== value) {
-                const duplicate = await Estado.findOne({ where: { estado: value }, transaction: t });
-                if (duplicate) {
-                    const err = new Error('El estado ya existe');
+                const existe = await Estado.findOne({
+                    where: {
+                        estado: value,
+                        id_estado: { [Op.ne]: id }
+                    },
+                    transaction: t
+                });
+                if (existe) {
+                    const err = new Error('El estado ya existe.');
                     err.statusCode = 409;
                     throw err;
                 }
             }
 
             await record.update({ estado: value }, { transaction: t });
-            return await Estado.findByPk(id, { transaction: t });
+            return record;
         });
 
-        if (updated === null) {
-            return res.status(404).json({ success: false, message: 'Estado no encontrado' });
+        if (estadoActualizado === null) {
+            return res.status(404).json({ success: false, message: 'Estado no encontrado.' });
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Estado actualizado parcialmente',
+            message: 'Estado actualizado exitosamente.',
+            data: estadoActualizado
+        });
+    } catch (error) {
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
+        }
+        console.error('Error en estadoPut:', error.message || error);
+        return next(error);
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/v1/estados/:id
+// Actualizar parcialmente un estado por ID
+// ─────────────────────────────────────────────────────────────────────────────
+export const estadoPatch = async (req, res, next) => {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
+        }
+
+        const { estado } = req.body;
+
+        // El campo es el único actualizable; debe estar presente
+        if (estado === undefined || estado === null) {
+            return res.status(400).json({ success: false, message: 'El campo estado es requerido.' });
+        }
+        if (typeof estado !== 'string' || estado.trim() === '') {
+            return res.status(400).json({ success: false, message: 'El campo estado debe ser texto no vacío.' });
+        }
+
+        const value = estado.trim();
+
+        const maxLength = getMaxLength('estado');
+        if (value.length > maxLength) {
+            return res.status(400).json({
+                success: false,
+                message: `El campo estado no puede exceder ${maxLength} caracteres.`
+            });
+        }
+
+        const updated = await sequelize.transaction(async (t) => {
+            const record = await Estado.findByPk(id, { transaction: t });
+            if (!record) return null;
+
+            // Solo verificar duplicado si el valor realmente cambia
+            if (record.estado !== value) {
+                const duplicate = await Estado.findOne({
+                    where: {
+                        estado: value,
+                        id_estado: { [Op.ne]: id }
+                    },
+                    transaction: t
+                });
+                if (duplicate) {
+                    const err = new Error('El estado ya existe.');
+                    err.statusCode = 409;
+                    throw err;
+                }
+            }
+
+            await record.update({ estado: value }, { transaction: t });
+            return record;
+        });
+
+        if (updated === null) {
+            return res.status(404).json({ success: false, message: 'Estado no encontrado.' });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Estado actualizado parcialmente.',
             data: updated
         });
     } catch (error) {
         if (error.statusCode === 409) {
             return res.status(409).json({ success: false, message: error.message });
         }
-        console.error('Error en estadosPatch:', error.message || error);
+        console.error('Error en estadoPatch:', error.message || error);
         return next(error);
     }
-}
+};
 
-// Eliminar un genero por id
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/v1/estados/:id
+// Eliminar un estado por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const estadoDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
         const deleted = await sequelize.transaction(async (t) => {
@@ -290,22 +295,26 @@ export const estadoDelete = async (req, res, next) => {
         });
 
         if (deleted === null) {
-            return res.status(404).json({ success: false, message: 'Estado no encontrado' });
+            return res.status(404).json({ success: false, message: 'Estado no encontrado.' });
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Estado eliminado correctamente',
+            message: 'Estado eliminado correctamente.',
             data: deleted
         });
     } catch (error) {
-        // Manejo específico de FK constraint
-        if (error.name === 'SequelizeForeignKeyConstraintError' || /foreign key|referenc/i.test(error.message || '')) {
+        // Manejo específico de violación de FK
+        if (
+            error.name === 'SequelizeForeignKeyConstraintError' ||
+            /foreign key|referenc/i.test(error.message || '')
+        ) {
             return res.status(409).json({
                 success: false,
-                message: 'No se puede eliminar el estado: existen referencias en otras tablas'
+                message: 'No se puede eliminar el estado: está referenciado en otros registros.'
             });
         }
+        console.error('Error en estadoDelete:', error.message || error);
         return next(error);
     }
-}
+};

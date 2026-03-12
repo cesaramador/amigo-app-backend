@@ -2,29 +2,40 @@ import EstatusMaritales from "../../models/usuarios/estatusmaritales.model.js";
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
-// obtener todos los estatus maritales
+// Helper: obtener longitud máxima del atributo desde el modelo
+const getMaxLength = (field) => {
+    const attrs = EstatusMaritales.rawAttributes || {};
+    // DataTypes.STRING(n) almacena n en type.options.length
+    return attrs[field]?.type?.options?.length ?? 20;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/estatusmaritales
+// Obtener todos los estatus maritales (con paginación, búsqueda y orden)
+// ─────────────────────────────────────────────────────────────────────────────
 export const estatusmaritalesGet = async (req, res, next) => {
     try {
-        const page = Math.max(1, Number(req.query.page) || 1);
+        // Paginación segura
+        const page  = Math.max(1, Number(req.query.page)  || 1);
         const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
         const offset = (page - 1) * limit;
 
+        // Búsqueda por nombre — campo corregido a 'estatus_marital'
         const q = (req.query.q || '').trim();
-        const where = q ? { categoria_vivienda: { [Op.like]: `%${q}%` } } : {};
+        const where = q ? { estatus_marital: { [Op.like]: `%${q}%` } } : {};
 
-        const [sortField = 'id_estatusmarital', sortOrderRaw = 'asc'] = (req.query.sort || 'id_estatusmarital:asc').split(':');
+        // Orden seguro
         const allowedSortFields = ['id_estatusmarital', 'estatus_marital'];
+        const [sortField = 'id_estatusmarital', sortOrderRaw = 'asc'] =
+            (req.query.sort || 'id_estatusmarital:asc').split(':');
         const sortFieldSafe = allowedSortFields.includes(sortField) ? sortField : 'id_estatusmarital';
-        const sortOrder = String(sortOrderRaw).toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+        const sortOrder = sortOrderRaw.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
 
-        const result = await sequelize.transaction(async (t) => {
-            return await EstatusMaritales.findAndCountAll({
-                where,
-                limit,
-                offset,
-                order: [[sortFieldSafe, sortOrder]],
-                transaction: t
-            });
+        const result = await EstatusMaritales.findAndCountAll({
+            where,
+            limit,
+            offset,
+            order: [[sortFieldSafe, sortOrder]]
         });
 
         const total = result.count;
@@ -36,25 +47,26 @@ export const estatusmaritalesGet = async (req, res, next) => {
             data: result.rows
         });
     } catch (error) {
-        console.error('Error en estatusmaritalGet:', error.message || error);
+        console.error('Error en estatusmaritalesGet:', error.message || error);
         return next(error);
     }
-}
+};
 
-// obtener un estatus marital por id
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/estatusmaritales/:id
+// Obtener un estatus marital por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const estatusmaritalGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
-        const registro = await sequelize.transaction(async (t) => {
-            return await EstatusMaritales.findByPk(id, { transaction: t });
-        });
+        const registro = await EstatusMaritales.findByPk(id);
 
         if (!registro) {
-            return res.status(404).json({ success: false, message: 'Estatus marital no encontrado' });
+            return res.status(404).json({ success: false, message: 'Estatus marital no encontrado.' });
         }
 
         return res.status(200).json({ success: true, data: registro });
@@ -62,99 +74,128 @@ export const estatusmaritalGetById = async (req, res, next) => {
         console.error('Error en estatusmaritalGetById:', error.message || error);
         return next(error);
     }
-}
+};
 
-// crear un nuevo estatus marital
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/v1/estatusmaritales
+// Crear un nuevo estatus marital
+// ─────────────────────────────────────────────────────────────────────────────
 export const estatusmaritalPost = async (req, res, next) => {
     try {
         const { estatus_marital } = req.body;
 
-        // validación básica
+        // Validación de presencia y tipo
         if (!estatus_marital || typeof estatus_marital !== 'string' || estatus_marital.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_marital es obligatorio' });
+            return res.status(400).json({ success: false, message: 'El campo estatus_marital es obligatorio y debe ser texto.' });
         }
+
         const value = estatus_marital.trim();
 
-        // obtener longitud máxima desde el modelo si está definida
-        const attrs = EstatusMaritales.rawAttributes || {};
-        const maxLength = attrs.estatus_marital?.type?.options?.length ?? attrs.estatus_marital?._length ?? 20;
+        // Validación de longitud máxima desde el modelo
+        const maxLength = getMaxLength('estatus_marital');
         if (value.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo estatus_marital no puede exceder ${maxLength} caracteres` });
+            return res.status(400).json({
+                success: false,
+                message: `El campo estatus_marital no puede exceder ${maxLength} caracteres.`
+            });
         }
 
-        // verificar duplicado (case-insensitive)
-        const exists = await EstatusMaritales.findOne({
-            where: sequelize.where(
-                sequelize.fn('lower', sequelize.col('estatus_marital')),
-                value.toLowerCase()
-            )
-        });
-        if (exists) {
-            return res.status(409).json({ success: false, message: 'El estatus marital ya existe' });
-        }
-
-        // crear dentro de transacción
+        // Verificación de duplicado (case-insensitive) + creación dentro de la misma transacción
         const nuevo = await sequelize.transaction(async (t) => {
+            const exists = await EstatusMaritales.findOne({
+                where: sequelize.where(
+                    sequelize.fn('LOWER', sequelize.col('estatus_marital')),
+                    value.toLowerCase()
+                ),
+                transaction: t
+            });
+            if (exists) {
+                const err = new Error('El estatus marital ya existe.');
+                err.statusCode = 409;
+                throw err;
+            }
+
             return await EstatusMaritales.create({ estatus_marital: value }, { transaction: t });
         });
 
-        return res.status(201).json({ success: true, message: 'Estatus marital creado', data: nuevo });
+        return res.status(201).json({
+            success: true,
+            message: 'Estatus marital creado exitosamente.',
+            data: nuevo
+        });
     } catch (error) {
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message });
+        }
         console.error('Error en estatusmaritalPost:', error.message || error);
         return next(error);
     }
-}
+};
 
-// actualizar un estatus marital por id
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/v1/estatusmaritales/:id
+// Reemplazar completamente un estatus marital por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const estatusmaritalPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
         const { estatus_marital } = req.body;
         if (!estatus_marital || typeof estatus_marital !== 'string' || estatus_marital.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_marital es obligatorio' });
+            return res.status(400).json({ success: false, message: 'El campo estatus_marital es obligatorio y debe ser texto.' });
         }
+
         const value = estatus_marital.trim();
 
-        // obtener longitud máxima desde el modelo si está definida
-        const attrs = EstatusMaritales.rawAttributes || {};
-        const maxLength = attrs.estatus_marital?.type?.options?.length ?? attrs.estatus_marital?._length ?? 20;
+        const maxLength = getMaxLength('estatus_marital');
         if (value.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo estatus_marital no puede exceder ${maxLength} caracteres` });
+            return res.status(400).json({
+                success: false,
+                message: `El campo estatus_marital no puede exceder ${maxLength} caracteres.`
+            });
         }
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await EstatusMaritales.findByPk(id, { transaction: t });
             if (!record) return null;
 
-            // si cambia, verificar existencia de duplicado (case-insensitive)
-            if (record.estatus_marital !== value) {
+            // Verificar duplicado case-insensitive solo si el valor cambia
+            if (record.estatus_marital.toLowerCase() !== value.toLowerCase()) {
                 const exists = await EstatusMaritales.findOne({
-                    where: sequelize.where(
-                        sequelize.fn('lower', sequelize.col('estatus_marital')),
-                        value.toLowerCase()
-                    ),
+                    where: {
+                        [Op.and]: [
+                            sequelize.where(
+                                sequelize.fn('LOWER', sequelize.col('estatus_marital')),
+                                value.toLowerCase()
+                            ),
+                            { id_estatusmarital: { [Op.ne]: id } }
+                        ]
+                    },
                     transaction: t
                 });
-                if (exists && (exists.id_estatusmarital ?? exists.id) !== id) {
-                    const err = new Error('El estatus marital ya existe');
+                if (exists) {
+                    const err = new Error('El estatus marital ya existe.');
                     err.statusCode = 409;
                     throw err;
                 }
             }
 
             await record.update({ estatus_marital: value }, { transaction: t });
-            return await EstatusMaritales.findByPk(id, { transaction: t });
+            return record;
         });
 
-        if (!updated) {
-            return res.status(404).json({ success: false, message: 'Estatus marital no encontrado' });
+        if (updated === null) {
+            return res.status(404).json({ success: false, message: 'Estatus marital no encontrado.' });
         }
 
-        return res.status(200).json({ success: true, message: 'Estatus marital actualizado', data: updated });
+        return res.status(200).json({
+            success: true,
+            message: 'Estatus marital actualizado exitosamente.',
+            data: updated
+        });
     } catch (error) {
         if (error.statusCode === 409) {
             return res.status(409).json({ success: false, message: error.message });
@@ -162,61 +203,77 @@ export const estatusmaritalPut = async (req, res, next) => {
         console.error('Error en estatusmaritalPut:', error.message || error);
         return next(error);
     }
-}
+};
 
-// actualizar un estatus marital por id
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/v1/estatusmaritales/:id
+// Actualizar parcialmente un estatus marital por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const estatusmaritalPatch = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
         const { estatus_marital } = req.body;
-        if (typeof estatus_marital === 'undefined') {
-            return res.status(400).json({ success: false, message: 'No hay campos para actualizar' });
+
+        // El campo es el único actualizable; debe estar presente
+        if (estatus_marital === undefined || estatus_marital === null) {
+            return res.status(400).json({ success: false, message: 'El campo estatus_marital es requerido.' });
+        }
+        if (typeof estatus_marital !== 'string' || estatus_marital.trim() === '') {
+            return res.status(400).json({ success: false, message: 'El campo estatus_marital debe ser texto no vacío.' });
         }
 
-        if (estatus_marital === null || typeof estatus_marital !== 'string' || estatus_marital.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Campo "estatus_marital" inválido' });
-        }
         const value = estatus_marital.trim();
 
-        // obtener longitud máxima desde el modelo si está definida
-        const attrs = EstatusMaritales.rawAttributes || {};
-        const maxLength = attrs.estatus_marital?.type?.options?.length ?? attrs.estatus_marital?._length ?? 20;
+        const maxLength = getMaxLength('estatus_marital');
         if (value.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo estatus_marital no puede exceder ${maxLength} caracteres` });
+            return res.status(400).json({
+                success: false,
+                message: `El campo estatus_marital no puede exceder ${maxLength} caracteres.`
+            });
         }
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await EstatusMaritales.findByPk(id, { transaction: t });
             if (!record) return null;
 
-            if (record.estatus_marital !== value) {
+            // Solo verificar duplicado case-insensitive si el valor realmente cambia
+            if (record.estatus_marital.toLowerCase() !== value.toLowerCase()) {
                 const exists = await EstatusMaritales.findOne({
-                    where: sequelize.where(
-                        sequelize.fn('lower', sequelize.col('estatus_marital')),
-                        value.toLowerCase()
-                    ),
+                    where: {
+                        [Op.and]: [
+                            sequelize.where(
+                                sequelize.fn('LOWER', sequelize.col('estatus_marital')),
+                                value.toLowerCase()
+                            ),
+                            { id_estatusmarital: { [Op.ne]: id } }
+                        ]
+                    },
                     transaction: t
                 });
-                if (exists && (exists.id_estatusmarital ?? exists.id) !== id) {
-                    const err = new Error('El estatus marital ya existe');
+                if (exists) {
+                    const err = new Error('El estatus marital ya existe.');
                     err.statusCode = 409;
                     throw err;
                 }
             }
 
             await record.update({ estatus_marital: value }, { transaction: t });
-            return await EstatusMaritales.findByPk(id, { transaction: t });
+            return record;
         });
 
-        if (!updated) {
-            return res.status(404).json({ success: false, message: 'Estatus marital no encontrado' });
+        if (updated === null) {
+            return res.status(404).json({ success: false, message: 'Estatus marital no encontrado.' });
         }
 
-        return res.status(200).json({ success: true, message: 'Estatus marital actualizado parcialmente', data: updated });
+        return res.status(200).json({
+            success: true,
+            message: 'Estatus marital actualizado parcialmente.',
+            data: updated
+        });
     } catch (error) {
         if (error.statusCode === 409) {
             return res.status(409).json({ success: false, message: error.message });
@@ -224,14 +281,17 @@ export const estatusmaritalPatch = async (req, res, next) => {
         console.error('Error en estatusmaritalPatch:', error.message || error);
         return next(error);
     }
-}
+};
 
-// eliminar un estatus marital por id
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/v1/estatusmaritales/:id
+// Eliminar un estatus marital por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const estatusmaritalDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
         const deleted = await sequelize.transaction(async (t) => {
@@ -243,24 +303,27 @@ export const estatusmaritalDelete = async (req, res, next) => {
             return snapshot;
         });
 
-        if (!deleted) {
-            return res.status(404).json({ success: false, message: 'Estatus marital no encontrado' });
+        if (deleted === null) {
+            return res.status(404).json({ success: false, message: 'Estatus marital no encontrado.' });
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Estatus marital eliminado correctamente',
+            message: 'Estatus marital eliminado correctamente.',
             data: deleted
         });
     } catch (error) {
-        // Manejo específico de FK constraint
-        if (error.name === 'SequelizeForeignKeyConstraintError' || /foreign key|referenc/i.test(error.message || '')) {
+        // Manejo específico de violación de FK
+        if (
+            error.name === 'SequelizeForeignKeyConstraintError' ||
+            /foreign key|referenc/i.test(error.message || '')
+        ) {
             return res.status(409).json({
                 success: false,
-                message: 'No se puede eliminar: existen referencias en otras tablas'
+                message: 'No se puede eliminar el estatus marital: está referenciado en otros registros.'
             });
         }
         console.error('Error en estatusmaritalDelete:', error.message || error);
         return next(error);
     }
-}
+};

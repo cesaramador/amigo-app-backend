@@ -10,8 +10,7 @@ const Generos = sequelize.define('Generos', {
         allowNull: false
     },
     genero: {
-        type: DataTypes.STRING,
-        length: 10,
+        type: DataTypes.STRING(10),
         allowNull: false,
         unique: true
     }

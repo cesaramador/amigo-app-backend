@@ -11,8 +11,7 @@ const EstatusUsuarios = sequelize.define('EstatusUsuarios', {
         allowNull: false
     },
     estatus_usuario: {
-        type: DataTypes.STRING,
-        length: 20,
+        type: DataTypes.STRING(20),
         allowNull: false,
         unique: true
     }

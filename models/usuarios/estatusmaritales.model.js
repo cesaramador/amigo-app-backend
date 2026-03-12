@@ -11,8 +11,7 @@ const EstatusMaritales = sequelize.define('EstatusMaritales', {
         allowNull: false
     },
     estatus_marital: {
-        type: DataTypes.STRING,
-        length: 20,
+        type: DataTypes.STRING(20),
         allowNull: false,
         unique: true
     }

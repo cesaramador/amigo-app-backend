@@ -4,506 +4,510 @@ import { sequelize } from '../../database/mysql.js';
 import { SMTP_HOST, SMTP_USER, SMTP_PASS } from '../../config/env.js';
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
-// import { JWT_EXPIRES_IN, JWT_SECRET } from '../../config/env.js';
-// import jwt from "jsonwebtoken";
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Extraer longitudes máximas desde rawAttributes del modelo
+const getModelMaxLengths = () => {
+    const attrs = Usuario.rawAttributes || {};
+    const maxLengths = {};
+    for (const [name, meta] of Object.entries(attrs)) {
+        const len = meta.type?.options?.length;
+        if (len) maxLengths[name] = len;
+    }
+    return maxLengths;
+};
+
+// Regex de validación
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const TEL_RE   = /^[\d+\-\s()]+$/;
+
+// Campos de la lista blanca para escritura (excluye PK y fecha_registro)
+const ALLOWED_WRITE_FIELDS = [
+    'id_tipousuario', 'nombre', 'ap_paterno', 'ap_materno', 'fecha_nacimiento',
+    'telefono_personal', 'telefono_contacto', 'email',
+    'id_estado', 'id_municipio', 'colonia', 'calle', 'numero_int', 'numero_ext',
+    'codigo_postal', 'razon_social', 'rfc',
+    'id_genero', 'id_estatus_usuario', 'id_estatus_marital', 'id_categoria_vivienda'
+];
+
+// Construir payload seguro desde req.body, solo campos en whitelist
+const buildPayload = (body, allowedFields) => {
+    const payload = {};
+    for (const key of allowedFields) {
+        if (Object.prototype.hasOwnProperty.call(body, key)) {
+            const val = body[key];
+            if (val !== null && typeof val === 'object') {
+                throw Object.assign(new TypeError(`Campo malformado: ${key}`), { statusCode: 400 });
+            }
+            payload[key] = val;
+        }
+    }
+    return payload;
+};
+
+// Validar formato de email y teléfono
+const validateFormats = (payload, maxLengths) => {
+    const errors = [];
+    if (payload.email !== undefined) {
+        if (!payload.email || !EMAIL_RE.test(String(payload.email))) {
+            errors.push({ field: 'email', reason: 'Formato de email inválido.' });
+        }
+    }
+    if (payload.telefono_personal !== undefined) {
+        const tel = String(payload.telefono_personal || '');
+        const maxTel = maxLengths.telefono_personal ?? 10;
+        if (!TEL_RE.test(tel) || tel.length > maxTel) {
+            errors.push({ field: 'telefono_personal', reason: `Formato inválido o excede ${maxTel} caracteres.` });
+        }
+    }
+    if (payload.telefono_contacto !== undefined && payload.telefono_contacto) {
+        const tel = String(payload.telefono_contacto);
+        const maxTel = maxLengths.telefono_contacto ?? 10;
+        if (!TEL_RE.test(tel) || tel.length > maxTel) {
+            errors.push({ field: 'telefono_contacto', reason: `Formato inválido o excede ${maxTel} caracteres.` });
+        }
+    }
+    // Validar longitudes de campos STRING
+    for (const [field, maxLen] of Object.entries(maxLengths)) {
+        if (payload[field] !== undefined && payload[field] !== null) {
+            const str = String(payload[field]);
+            if (str.length > maxLen) {
+                errors.push({ field, reason: `No puede exceder ${maxLen} caracteres.` });
+            }
+        }
+    }
+    return errors;
+};
+
+// Enviar correo con código de verificación (fire-and-forget, no bloquea la respuesta)
+const sendVerificationEmail = (toEmail, nombre, codigoPlain) => {
+    (async () => {
+        try {
+            const transporter = nodemailer.createTransport({
+                service: SMTP_HOST,
+                auth: { user: SMTP_USER, pass: SMTP_PASS }
+            });
+            await transporter.sendMail({
+                from: SMTP_USER,
+                to: toEmail,
+                subject: 'Código de acceso inicial App Amigo',
+                html: `
+                    <p>Hola ${nombre},</p>
+                    <p>Tu código para tu acceso es:</p>
+                    <h2>${codigoPlain}</h2>
+                    <p>Este código solo será necesario en tu primer inicio de sesión.</p>
+                `
+            });
+        } catch (e) {
+            console.warn('No se pudo enviar el correo de verificación:', e.message);
+        }
+    })();
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/usuarios
+// Obtener todos los usuarios (con paginación, búsqueda, filtros y orden)
+// ─────────────────────────────────────────────────────────────────────────────
 export const usuariosGet = async (req, res, next) => {
     try {
-        // Paginación y orden
-        const page = Math.max(1, Number(req.query.page) || 1);
+        const page  = Math.max(1, Number(req.query.page)  || 1);
         const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
         const offset = (page - 1) * limit;
 
-        // Búsqueda y filtros
-        const q = (req.query.q || '').trim();
+        // Filtros por FK enteras
         const filters = {};
-        // permitir filtros simples por id_genero, id_estatus_usuario, id_tipousuario, etc.
-        ['id_genero','id_estatus_usuario','id_tipousuario','id_estado','id_municipio'].forEach(key => {
+        ['id_genero', 'id_estatus_usuario', 'id_tipousuario', 'id_estado', 'id_municipio'].forEach(key => {
             if (req.query[key] !== undefined) {
                 const v = Number(req.query[key]);
-                if (!Number.isNaN(v)) filters[key] = v;
+                if (!Number.isNaN(v) && v > 0) filters[key] = v;
             }
         });
 
-        // Construir where con búsqueda por texto
+        // Búsqueda por texto
+        const q = (req.query.q || '').trim();
         const where = { ...filters };
         if (q) {
             where[Op.or] = [
-                { nombre: { [Op.like]: `%${q}%` } },
-                { ap_paterno: { [Op.like]: `%${q}%` } },
-                { ap_materno: { [Op.like]: `%${q}%` } },
-                { email: { [Op.like]: `%${q}%` } },
+                { nombre:            { [Op.like]: `%${q}%` } },
+                { ap_paterno:        { [Op.like]: `%${q}%` } },
+                { ap_materno:        { [Op.like]: `%${q}%` } },
+                { email:             { [Op.like]: `%${q}%` } },
                 { telefono_personal: { [Op.like]: `%${q}%` } }
             ];
         }
 
-        // Orden seguro: validar campos permitidos
-        const [sortField = 'id_usuario', sortOrderRaw = 'asc'] = (req.query.sort || 'id_usuario:asc').split(':');
-        const allowedSortFields = ['id_usuario','nombre','fecha_registro','id_tipousuario'];
+        // Orden seguro
+        const allowedSortFields = ['id_usuario', 'nombre', 'fecha_registro', 'id_tipousuario', 'ap_paterno'];
+        const [sortField = 'id_usuario', sortOrderRaw = 'asc'] =
+            (req.query.sort || 'id_usuario:asc').split(':');
         const sortFieldSafe = allowedSortFields.includes(sortField) ? sortField : 'id_usuario';
-        const sortOrder = (String(sortOrderRaw).toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+        const sortOrder = sortOrderRaw.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
 
-        // Ejecutar consulta con transacción (paginada), excluir codigo
-        const usuarios = await sequelize.transaction(async (t) => {
-            return await Usuario.findAndCountAll({
-                where,
-                attributes: { exclude: ['codigo'] },
-                limit,
-                offset,
-                order: [[sortFieldSafe, sortOrder]],
-                transaction: t
-            });
+        const result = await Usuario.findAndCountAll({
+            where,
+            attributes: { exclude: ['codigo'] },   // nunca exponer el hash
+            limit,
+            offset,
+            order: [[sortFieldSafe, sortOrder]]
         });
 
-        const total = usuarios.count;
+        const total = result.count;
         const pages = Math.ceil(total / limit) || 1;
 
         return res.status(200).json({
             success: true,
-            message: 'Usuarios obtenidos exitosamente',
-            meta: {
-                total,
-                page,
-                pages,
-                limit,
-                sort: `${sortFieldSafe}:${sortOrder}`
-            },
-            data: usuarios.rows
+            meta: { total, page, pages, limit, sort: `${sortFieldSafe}:${sortOrder}` },
+            data: result.rows
         });
     } catch (error) {
         console.error('Error en usuariosGet:', error.message || error);
         return next(error);
     }
-}
+};
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/usuarios/:id
+// Obtener un usuario por ID (sin exponer codigo)
+// ─────────────────────────────────────────────────────────────────────────────
 export const usuarioGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
-        // Excluir campos sensibles como codigo
-        // const usuario = await Usuario.findByPk(id, {
-        //     attributes: { exclude: ['codigo'] }
-        // });
-        // if (!usuario) {
-        //     return res.status(404).json({ message: 'Usuario no encontrado' });
-        // }
-        // return res.status(200).json(usuario);
-
-        // Buscar usuario con transacción (opcional pero recomendado para consistencia)
-        const usuario = await sequelize.transaction(async (t) => {
-            return await Usuario.findByPk(id, {
-                attributes: { exclude: ['codigo'] },
-                transaction: t
-            });
+        const usuario = await Usuario.findByPk(id, {
+            attributes: { exclude: ['codigo'] }
         });
 
         if (!usuario) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
         }
 
-        return res.status(200).json({
-            success: true,
-            message: 'Usuario obtenido exitosamente',
-            data: usuario
-        });
-
+        return res.status(200).json({ success: true, data: usuario });
     } catch (error) {
-        console.error('Error en usuariosGetById:', error.message || error);
+        console.error('Error en usuarioGetById:', error.message || error);
         return next(error);
     }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/v1/usuarios
+// Registrar un nuevo usuario
+// ─────────────────────────────────────────────────────────────────────────────
 export const usuarioPost = async (req, res, next) => {
     try {
-        console.log('Body recibido:', JSON.stringify(req.body)); // ver payload limpio
+        const maxLengths = getModelMaxLengths();
 
-        // Lista blanca de campos permitidos (ajusta según tu esquema)
-        const allowed = [
-            'id_tipousuario','nombre','ap_paterno','ap_materno','fecha_nacimiento',
-            'telefono_personal','telefono_contacto','email','codigo',
-            'id_estado','id_municipio','colonia','calle','numero_int','numero_ext',
-            'codigo_postal','razon_social','rfc','fecha_registro','id_genero',
-            'id_estatus_usuario','id_estatus_marital','id_categoria_vivienda'
-        ];
+        // Construir payload con lista blanca
+        const payload = buildPayload(req.body, ALLOWED_WRITE_FIELDS);
 
-        // Construir payload sólo con campos permitidos y convertir tipos simples
-        const payload = {};
-
-        for (const key of allowed) {
-            if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-                const val = req.body[key];
-                // evita insertar objetos completos (solo primitivos o null)
-                if (val !== null && typeof val === 'object') {
-                    // opcional: saltar o transformarlo; aquí lanzamos para detectar el campo
-                    throw new TypeError(`Campo no permitido o malformado: ${key}`);
-                }
-                payload[key] = val;
-            }
-        }
-
-        // Extraer restricciones desde el modelo
+        // Validar campos obligatorios según modelo (allowNull: false sin defaultValue ni PK)
         const attrs = Usuario.rawAttributes || {};
-        const requiredFields = [];
-        const maxLengths = {};
-        for (const [name, meta] of Object.entries(attrs)) {
-            if (meta.allowNull === false && !meta.primaryKey && typeof meta.defaultValue === 'undefined') {
-                requiredFields.push(name);
-            }
-            // detectar longitud si fue definida como DataTypes.STRING(50)
-            const len = meta.type?.options?.length ?? meta.type?._length;
-            if (len) maxLengths[name] = len;
-        }
-        
-        // Validar campos obligatorios (según modelo)
+        const requiredFields = Object.keys(attrs).filter(name => {
+            const m = attrs[name];
+            return m.allowNull === false && !m.primaryKey && m.defaultValue === undefined && name !== 'codigo' && name !== 'fecha_registro';
+        });
         const missing = requiredFields.filter(f => {
-            // ignore id auto increment
-            if (attrs[f]?.primaryKey) return false;
             const v = payload[f];
             return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
         });
         if (missing.length) {
-            return res.status(400).json({ message: 'Faltan campos obligatorios según el modelo', fields: missing });
+            return res.status(400).json({ success: false, message: 'Faltan campos obligatorios.', fields: missing });
         }
 
-        // Validaciones básicas por campo
-        const invalid = [];
-        if (payload.email) {
-            const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRe.test(String(payload.email))) invalid.push({ field: 'email', reason: 'Formato inválido' });
-        }
-        if (payload.telefono_personal) {
-            const tel = String(payload.telefono_personal);
-            if (!/^[\d+\-\s()]+$/.test(tel) || tel.length > (maxLengths.telefono_personal ?? 10)) {
-                invalid.push({ field: 'telefono_personal', reason: 'Formato inválido o demasiado largo' });
-            }
+        // Validar formatos y longitudes
+        const formatErrors = validateFormats(payload, maxLengths);
+        if (formatErrors.length) {
+            return res.status(400).json({ success: false, message: 'Errores de formato en los datos.', fields: formatErrors });
         }
 
-        if (invalid.length) {
-            return res.status(409).json({ message: 'Formato inválido en Email / Telefono Personal', fields: invalid });
-        }
+        // Generar código de 5 dígitos y hashearlo ANTES de la transacción
+        const codigoPlain = Math.floor(10000 + Math.random() * 90000).toString();
+        const codigoHash  = await bcrypt.hash(codigoPlain, 10);
 
-        // Comprobar unicidad en BD (email, telefono_personal)
-        const conflicts = [];
-        if (payload.email) {
-            const exists = await Usuario.findOne({ where: { email: payload.email } });
-            if (exists) conflicts.push('email');
-        }
-        if (payload.telefono_personal) {
-            const exists = await Usuario.findOne({ where: { telefono_personal: payload.telefono_personal } });
-            if (exists) conflicts.push('telefono_personal');
-        }
-        if (conflicts.length) {
-            return res.status(409).json({ message: 'Valores duplicados en la base de datos', fields: conflicts });
-        }
-
-        // --- GENERAR CÓDIGO DE 5 DÍGITOS Y HASHEARLO ---
-        const codigoPlain = Math.floor(10000 + Math.random() * 90000).toString(); // e.g. "48291"
-        const saltCodigo = await bcrypt.genSalt(10);
-        const codigoHash = await bcrypt.hash(codigoPlain, saltCodigo);
-        // asignar código hasheado al payload
-        payload.codigo = codigoHash;
-
-        // Enviar codigo de verificación para pruebas
-        // console.log("El codigo generado es: " + codigoPlain); // Para pruebas: mostrar el código generado en consola
-
-        // Asignar fecha de registro actual si no se proporcionó
+        // Asignar fecha de registro y código hasheado
+        payload.codigo         = codigoHash;
         payload.fecha_registro = new Date();
 
-        // --- GUARDAR USUARIO EN LA BASE DE DATOS DENTRO DE UNA TRANSACCIÓN ---
-        // Si no lanzas error → Sequelize hace commit automático.
-        // Si lanzas un error → Sequelize hace rollback automático.
+        // Verificación de unicidad + creación en una sola transacción atómica
         const nuevousuario = await sequelize.transaction(async (t) => {
-
-            const usuario = await Usuario.create(payload, { transaction: t });
-
-            if (!usuario.email.includes("@")) {
-                throw new Error("Email inválido — se hace rollback automático");
+            // Verificar unicidad de email
+            if (payload.email) {
+                const existsEmail = await Usuario.findOne({
+                    where: { email: payload.email },
+                    transaction: t
+                });
+                if (existsEmail) {
+                    const err = new Error('El email ya está registrado.');
+                    err.statusCode = 409;
+                    err.field = 'email';
+                    throw err;
+                }
+            }
+            // Verificar unicidad de telefono_personal
+            if (payload.telefono_personal) {
+                const existsTel = await Usuario.findOne({
+                    where: { telefono_personal: payload.telefono_personal },
+                    transaction: t
+                });
+                if (existsTel) {
+                    const err = new Error('El teléfono personal ya está registrado.');
+                    err.statusCode = 409;
+                    err.field = 'telefono_personal';
+                    throw err;
+                }
             }
 
-            return usuario; // commit automático
+            return await Usuario.create(payload, { transaction: t });
         });
-        
-        // --- GENERAR TOKEN JWT ---
-        // "payload.telefono_personal" es obtenido del formulario llenado por el usuario 
-        // y se usa para crear el token e identificar al usuario
-        // const token_init = { id: payload.telefono_personal };
-        // const token = jwt.sign(token_init, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
-        // Excluir codigo de la respuesta
-        // const response = nuevousuario.get({ plain: true });
-        // delete response.codigo;
-
-        const userSafe = { ...nuevousuario.get() };
+        // Preparar respuesta segura (sin exponer codigo/hash)
+        const userSafe = nuevousuario.get({ plain: true });
         delete userSafe.codigo;
 
-        // --- ENVIAR CORREO CON EL CÓDIGO ORIGINAL ---
-        // debe configurarse el password de gmail para apps menos seguras o usar OAuth2, sino no funcionará
-        // https://support.google.com/mail/answer/185833?hl=es-419
-        // Crea y administra las contraseñas de aplicaciones
-        // https://myaccount.google.com/apppasswords
-        
-        // visualizar configuración SMTP
-        // console.log("Host: ", SMTP_HOST, "Pass ", SMTP_PASS, "User: ", SMTP_USER);
-        
-        (async () => {
-            try {
-                const transporter = nodemailer.createTransport({
-                    service: SMTP_HOST,
-                    auth: { user: SMTP_USER, pass: SMTP_PASS }
-                });
-
-                // Enviar correo
-                await transporter.sendMail({
-                    from: SMTP_USER,
-                    to: payload.email,
-                    subject: "Código de acceso inicial App Amigo",
-                    html: `
-                        <p>Hola ${payload.nombre},</p>
-                        <p>Tu código para tu acceso es:</p>
-                        <h2>${codigoPlain}</h2>
-                        <p>Este código solo será necesario en tu primer inicio de sesión.</p>
-                    `
-                });
-
-            } catch (e) {
-                console.warn("No se pudo enviar el correo:", e.message);
-            }
-        })();
+        // Enviar correo con código en texto plano (fire-and-forget)
+        sendVerificationEmail(payload.email, payload.nombre, codigoPlain);
 
         return res.status(201).json({
             success: true,
             message: 'Usuario registrado correctamente. Se ha enviado un código de verificación por email.',
-            data: {
-                // token,
-                // valorCookie,
-                codigoHash,
-                codigoPlain,
-                user: userSafe
-            }
+            data: { user: userSafe }
         });
-
     } catch (error) {
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message, field: error.field });
+        }
+        if (error.statusCode === 400) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
         console.error('Error en usuarioPost:', error.message || error);
         return next(error);
-        // console.error("Error en registrarUsuario:", error);
-        // return res.status(500).json({
-        //     success: false,
-        //     message: "Error interno en registro."
-        // });
     }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/v1/usuarios/:id
+// Reemplazar completamente un usuario por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const usuarioPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
-        const usuario = await Usuario.findByPk(id);
-        if (!usuario) return res.status(404).json({ message: 'Usuario no encontrado' });
+        const maxLengths = getModelMaxLengths();
+        const payload = buildPayload(req.body, ALLOWED_WRITE_FIELDS);
 
-        // Construir lista blanca desde el modelo (excluir PK y campos inmutables)
-        const attrs = Usuario.rawAttributes || {};
-        const allowed = Object.keys(attrs).filter(k => !attrs[k].primaryKey && k !== 'fecha_registro');
-
-        // Crear payload seguro
-        const payload = {};
-        for (const key of allowed) {
-            if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-                const val = req.body[key];
-                if (val !== null && typeof val === 'object') {
-                    return res.status(400).json({ message: `Campo malformado: ${key}` });
-                }
-                payload[key] = val;
-            }
-        }
         if (Object.keys(payload).length === 0) {
-            return res.status(400).json({ message: 'No hay campos válidos para actualizar' });
+            return res.status(400).json({ success: false, message: 'No hay campos válidos para actualizar.' });
         }
 
-        // Validaciones simples: longitudes y formato de email/telefono (extraer longitudes del modelo si existen)
-        const maxLengths = {};
-        // for (const [name, meta] of Object.entries(attrs)) {
-        //     const len = meta.type?.options?.length ?? meta.type?._length;
-        //     if (len) maxLengths[name] = len;
-        // }
-        if (payload.email) {
-            const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRe.test(String(payload.email))) {
-                return res.status(400).json({ message: 'Email con formato inválido' });
-            }
-        }
-        if (payload.telefono_personal) {
-            const tel = String(payload.telefono_personal);
-            if (!/^[\d+\-\s()]+$/.test(tel) || tel.length > (maxLengths.telefono_personal ?? 10)) {
-                return res.status(400).json({ message: 'Teléfono con formato inválido o demasiado largo' });
-            }
-        }
-        // verificar longitudes generales
-        // const tooLong = Object.entries(maxLengths).find(([k, len]) => payload[k] && String(payload[k]).length > len);
-        // if (tooLong) {
-        //     return res.status(400).json({ message: `Campo demasiado largo: ${tooLong[0]} (máx ${tooLong[1]})` });
-        // }
-
-        // Comprobar unicidad (si cambian email/telefono_personal/rfc)
-        const uniqueChecks = ['email', 'telefono_personal'];
-        const conflicts = [];
-        for (const field of uniqueChecks) {
-            if (payload[field]) {
-                const exists = await Usuario.findOne({
-                    where: { [field]: payload[field], id_usuario: { [Op.ne]: id } }
-                });
-                if (exists) conflicts.push(field);
-            }
-        }
-        if (conflicts.length) return res.status(409).json({ message: 'Valores duplicados', fields: conflicts });
-
-        // Opcional: hashear codigo si se actualiza (requiere bcrypt instalado)
+        // Si se actualiza el codigo, hashearlo antes de guardar
         if (payload.codigo) {
-            // const bcrypt = await import('bcrypt'); // usar si se quiere dinámico
-            // payload.codigo = await bcrypt.hash(payload.codigo, 10);
-            // Si no desea hashear aquí, deje el comentario y maneje en capa adecuada.
+            payload.codigo = await bcrypt.hash(String(payload.codigo), 10);
         }
 
-        // Actualizar en transacción y devolver usuario sin codigo
+        // Validar formatos y longitudes
+        const formatErrors = validateFormats(payload, maxLengths);
+        if (formatErrors.length) {
+            return res.status(400).json({ success: false, message: 'Errores de formato en los datos.', fields: formatErrors });
+        }
+
+        // Verificar unicidad + actualización en una sola transacción
         const result = await sequelize.transaction(async (t) => {
-            await usuario.update(payload, { transaction: t });
-            return await Usuario.findByPk(id, { attributes: { exclude: ['codigo'] }, transaction: t });
+            const record = await Usuario.findByPk(id, { transaction: t });
+            if (!record) return null;
+
+            // Verificar unicidad de email (excluir el propio registro)
+            if (payload.email) {
+                const exists = await Usuario.findOne({
+                    where: { email: payload.email, id_usuario: { [Op.ne]: id } },
+                    transaction: t
+                });
+                if (exists) {
+                    const err = new Error('El email ya está registrado por otro usuario.');
+                    err.statusCode = 409;
+                    err.field = 'email';
+                    throw err;
+                }
+            }
+            // Verificar unicidad de telefono_personal (excluir el propio registro)
+            if (payload.telefono_personal) {
+                const exists = await Usuario.findOne({
+                    where: { telefono_personal: payload.telefono_personal, id_usuario: { [Op.ne]: id } },
+                    transaction: t
+                });
+                if (exists) {
+                    const err = new Error('El teléfono personal ya está registrado por otro usuario.');
+                    err.statusCode = 409;
+                    err.field = 'telefono_personal';
+                    throw err;
+                }
+            }
+
+            await record.update(payload, { transaction: t });
+            return record;
         });
 
-        return res.status(200).json(result);
+        if (result === null) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
+        }
+
+        // Respuesta segura sin codigo
+        const userSafe = result.get({ plain: true });
+        delete userSafe.codigo;
+
+        return res.status(200).json({
+            success: true,
+            message: 'Usuario actualizado exitosamente.',
+            data: userSafe
+        });
     } catch (error) {
-        console.error('Error en usuariosPut:', error.message || error);
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message, field: error.field });
+        }
+        if (error.statusCode === 400) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+        console.error('Error en usuarioPut:', error.message || error);
         return next(error);
     }
-}
+};
 
-
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/v1/usuarios/:id
+// Actualizar parcialmente un usuario por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const usuarioPatch = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
-        const usuario = await Usuario.findByPk(id);
-        if (!usuario) return res.status(404).json({ message: 'Usuario no encontrado' });
-
-        // Construir lista blanca desde el modelo (excluir PK y campos inmutables)
-        const attrs = Usuario.rawAttributes || {};
-        const allowed = Object.keys(attrs).filter(k => !attrs[k].primaryKey && k !== 'fecha_registro');
-
-        // Construir payload seguro (ignore campos no permitidos)
-        const payload = {};
-        for (const key of allowed) {
-            if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-                const val = req.body[key];
-                if (val !== null && typeof val === 'object') {
-                    return res.status(400).json({ message: `Campo malformado: ${key}` });
-                }
-                payload[key] = val;
-            }
-        }
+        const maxLengths = getModelMaxLengths();
+        const payload = buildPayload(req.body, ALLOWED_WRITE_FIELDS);
 
         if (Object.keys(payload).length === 0) {
-            return res.status(400).json({ message: 'No hay campos válidos para actualizar' });
+            return res.status(400).json({ success: false, message: 'No hay campos válidos para actualizar.' });
         }
 
-        // Extraer longitudes (si existen) para validar
-        const maxLengths = {};
-        for (const [name, meta] of Object.entries(attrs)) {
-            const len = meta.type?.options?.length ?? meta.type?._length;
-            if (len) maxLengths[name] = len;
-        }
-
-        // Validaciones específicas
-        if (payload.email) {
-            const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRe.test(String(payload.email))) {
-                return res.status(400).json({ message: 'Email con formato inválido' });
-            }
-        }
-        if (payload.telefono_personal) {
-            const tel = String(payload.telefono_personal);
-            if (!/^[\d+\-\s()]+$/.test(tel) || tel.length > (maxLengths.telefono_personal ?? 20)) {
-                return res.status(400).json({ message: 'Teléfono con formato inválido o demasiado largo' });
-            }
-        }
-        // validar longitudes generales
-        // const tooLong = Object.entries(maxLengths).find(([k, len]) => payload[k] && String(payload[k]).length > len);
-        // if (tooLong) {
-        //     return res.status(400).json({ message: `Campo demasiado largo: ${tooLong[0]} (máx ${tooLong[1]})` });
-        // }
-
-        // Comprobar unicidad (si cambian email/telefono_personal/rfc)
-        const uniqueChecks = ['email', 'telefono_personal'];
-        const conflicts = [];
-        for (const field of uniqueChecks) {
-            if (payload[field]) {
-                const exists = await Usuario.findOne({
-                    where: { [field]: payload[field], id_usuario: { [Op.ne]: id } }
-                });
-                if (exists) conflicts.push(field);
-            }
-        }
-        if (conflicts.length) return res.status(409).json({ message: 'Valores duplicados', fields: conflicts });
-
-        // Opcional: hashear codigo si se actualiza (descomentar si se usa bcrypt)
+        // Si se actualiza el codigo, hashearlo antes de guardar
         if (payload.codigo) {
-            // const bcrypt = await import('bcrypt');
-            // payload.codigo = await bcrypt.hash(payload.codigo, 10);
+            payload.codigo = await bcrypt.hash(String(payload.codigo), 10);
         }
 
-        // Actualizar en transacción y devolver usuario sin codigo
+        // Validar formatos y longitudes
+        const formatErrors = validateFormats(payload, maxLengths);
+        if (formatErrors.length) {
+            return res.status(400).json({ success: false, message: 'Errores de formato en los datos.', fields: formatErrors });
+        }
+
+        // Verificar unicidad + actualización en una sola transacción
         const result = await sequelize.transaction(async (t) => {
-            await usuario.update(payload, { transaction: t });
-            return await Usuario.findByPk(id, { attributes: { exclude: ['codigo'] }, transaction: t });
+            const record = await Usuario.findByPk(id, { transaction: t });
+            if (!record) return null;
+
+            // Verificar unicidad de email (excluir el propio registro)
+            if (payload.email) {
+                const exists = await Usuario.findOne({
+                    where: { email: payload.email, id_usuario: { [Op.ne]: id } },
+                    transaction: t
+                });
+                if (exists) {
+                    const err = new Error('El email ya está registrado por otro usuario.');
+                    err.statusCode = 409;
+                    err.field = 'email';
+                    throw err;
+                }
+            }
+            // Verificar unicidad de telefono_personal (excluir el propio registro)
+            if (payload.telefono_personal) {
+                const exists = await Usuario.findOne({
+                    where: { telefono_personal: payload.telefono_personal, id_usuario: { [Op.ne]: id } },
+                    transaction: t
+                });
+                if (exists) {
+                    const err = new Error('El teléfono personal ya está registrado por otro usuario.');
+                    err.statusCode = 409;
+                    err.field = 'telefono_personal';
+                    throw err;
+                }
+            }
+
+            await record.update(payload, { transaction: t });
+            return record;
         });
 
-        return res.status(200).json(result);
+        if (result === null) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
+        }
+
+        // Respuesta segura sin codigo
+        const userSafe = result.get({ plain: true });
+        delete userSafe.codigo;
+
+        return res.status(200).json({
+            success: true,
+            message: 'Usuario actualizado parcialmente.',
+            data: userSafe
+        });
     } catch (error) {
-        console.error('Error en usuariosPatch:', error.message || error);
+        if (error.statusCode === 409) {
+            return res.status(409).json({ success: false, message: error.message, field: error.field });
+        }
+        if (error.statusCode === 400) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+        console.error('Error en usuarioPatch:', error.message || error);
         return next(error);
     }
-}
+};
 
-
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/v1/usuarios/:id
+// Eliminar un usuario por ID
+// ─────────────────────────────────────────────────────────────────────────────
 export const usuarioDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
         if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ message: 'ID inválido' });
+            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
         }
 
-        const usuario = await Usuario.findByPk(id);
-        if (!usuario) return res.status(404).json({ message: 'Usuario no encontrado' });
+        const deleted = await sequelize.transaction(async (t) => {
+            const record = await Usuario.findByPk(id, { transaction: t });
+            if (!record) return null;
 
-        // Guardar datos para respuesta (sin codigo)
-        const usuarioBefore = usuario.get({ plain: true });
-        delete usuarioBefore.codigo;
-
-        // Eliminar dentro de transacción (soporta modelos paranoid -> soft delete)
-        await sequelize.transaction(async (t) => {
-            await usuario.destroy({ transaction: t });
+            const snapshot = record.get({ plain: true });
+            delete snapshot.codigo;   // nunca exponer el hash en la respuesta
+            await record.destroy({ transaction: t });
+            return snapshot;
         });
 
-        // Responder con el registro eliminado (o 204 si prefieres sin body)
-        return res.status(200).json({ message: 'Usuario eliminado', data: usuarioBefore });
-    } catch (error) {
-        console.error('Error en usuariosDelete:', error.message || error);
-
-        // Manejo específico de FK constraint
-        if (error.name === 'SequelizeForeignKeyConstraintError' || /FOREIGN KEY|REFERENCES/.test(error.message || '')) {
-            return res.status(409).json({ message: 'No se puede eliminar el usuario: existen referencias en otras tablas' });
+        if (deleted === null) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
         }
 
+        return res.status(200).json({
+            success: true,
+            message: 'Usuario eliminado correctamente.',
+            data: deleted
+        });
+    } catch (error) {
+        if (
+            error.name === 'SequelizeForeignKeyConstraintError' ||
+            /foreign key|referenc/i.test(error.message || '')
+        ) {
+            return res.status(409).json({
+                success: false,
+                message: 'No se puede eliminar el usuario: está referenciado en otros registros.'
+            });
+        }
+        console.error('Error en usuarioDelete:', error.message || error);
         return next(error);
     }
-}
-
-
-
+};
