@@ -11,11 +11,13 @@ const MatrizAccesos = sequelize.define('MatrizAccesos', {
     },
     id_tipousuario: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: { model: 'TiposUsuarios', key: 'id_tipousuario' }
     },
     id_vista: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: { model: 'Vistas', key: 'id_vista' }
     },
     estatus: {
         type: DataTypes.BOOLEAN,
@@ -24,7 +26,10 @@ const MatrizAccesos = sequelize.define('MatrizAccesos', {
 },
 {
     timestamps: false,
-    tableName: 'MatrizAccesos'
+    tableName: 'MatrizAccesos',
+    indexes: [
+        { unique: true, fields: ['id_tipousuario', 'id_vista'] }
+    ]
 });
 
 export default MatrizAccesos;
