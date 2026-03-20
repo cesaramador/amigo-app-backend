@@ -9,7 +9,7 @@
 
 import { NODE_ENV } from "../config/env.js";
 
-export const errorMiddleware = (err, req, res) => {
+export const errorMiddleware = (err, req, res, next) => { // eslint-disable-line no-unused-vars
     console.error("🔥 Error capturado por middleware:", err);
 
     // Estructura base del error
@@ -50,7 +50,7 @@ export const errorMiddleware = (err, req, res) => {
 
     if (err.code === "ER_DUP_ENTRY") {
         statusCode = 409;
-        message = `Clave duplicada: ${err.sqlMessage.match(/'.*?'/)?.[0] || ""}`;
+        message = `Clave duplicada: ${err.sqlMessage?.match(/'.*?'/)?.[0] || ""}`;
     }
 
     if (err.code === "ER_NO_REFERENCED_ROW_2") {

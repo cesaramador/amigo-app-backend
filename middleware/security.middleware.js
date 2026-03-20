@@ -58,7 +58,7 @@ const isRateLimited = (ip, limit) => {
 /* ------------------ SANITIZACIÓN ------------------ */
 
 const sanitizeString = (str, opts) => {
-  let out = String(str).replace('/[\x00-\x1F]/g', "").trim();
+  let out = String(str).replace(/[\x00-\x1F]/g, "").trim();
   if (out.length > opts.maxStringLength) {
     if (opts.mode === "reject") throw new Error("Campo demasiado largo");
     out = out.slice(0, opts.maxStringLength);

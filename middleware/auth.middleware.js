@@ -3,9 +3,9 @@ import jwt from 'jsonwebtoken';
 import Usuario from "../models/usuarios/usuarios.model.js";
 
 // middleware para autorizar rutas protegidas
-// verificar el token del usuario autenticado en el request 
+// verificar el token del usuario autenticado en el request
 // y compararlo con el token del usuario en la base de datos
-// si es válido, permitir el acceso a la ruta protegida 
+// si es válido, permitir el acceso a la ruta protegida
 const autorizaAcceso = async (req, res, next) => {
     try {
         let token;
@@ -15,28 +15,24 @@ const autorizaAcceso = async (req, res, next) => {
         }
 
         if (!token) {
-            return res.status(401).json({ message: 'No estas autorizado para acceder a esta ruta' });
+            return res.status(401).json({ success: false, message: 'No estás autorizado para acceder a esta ruta' });
         }
 
         const decoded = jwt.verify(token, JWT_SECRET);
         const user = await Usuario.findOne({ where: { telefono_personal: decoded.id } });
 
         if (!user) {
-            return res.status(401).json({ message: 'El usuario asociado al token no existe' });
+            return res.status(401).json({ success: false, message: 'El usuario asociado al token no existe' });
         }
 
         req.user = user;
         next();
 
     } catch (error) {
-        if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ message: 'El token ha expirado. Por favor inicia sesión de nuevo.' });
-        }
-        if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ message: 'Token inválido o mal formado.' });
-        }
-        return res.status(401).json({ message: 'Sin autorización.', error: error.message || error });
+        // Propagar al errorMiddleware global, que ya maneja
+        // JsonWebTokenError y TokenExpiredError con respuestas 401 estandarizadas
+        next(error);
     }
-}
+};
 
 export default autorizaAcceso;

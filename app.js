@@ -72,20 +72,19 @@ const app = express();
 // ********************************************************************************************
 // MIDDLEWARES GENERALES
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Límite de payloads (evita ataques DoS por grandes cargas)
+app.use(express.json({ limit: "200kb" }));
+app.use(express.urlencoded({ limit: "200kb", extended: true }));
 app.use(cookieParser()); // para obtener cookies, no es para datos sensibles
 
 // Seguridad global avanzada
 app.disable("x-powered-by");  // Ocultar framework
 
-// Límite de payloads (evita ataques DoS por grandes cargas)
-app.use(express.json({ limit: "200kb" }));
-app.use(express.urlencoded({ limit: "200kb", extended: true }));
-
 // Middleware de sanitización básica
+// NOTA: Se excluyen { y } del array forbidden porque son parte válida del JSON.
+// El securityMiddleware realiza una inspección profunda del contenido de los campos.
 app.use((req, res, next) => {
-    const forbidden = ["$", "{", "}", "<", ">", ";"];
+    const forbidden = ["$", "<", ">", ";"];
     const bodyStr = JSON.stringify(req.body);
     const queryStr = JSON.stringify(req.query);
 
@@ -128,10 +127,10 @@ app.use(session({
     name: 'amigo',
     secret: SESSION_SECRET || 'keyboard_cat_dev',
     resave: false,
-    saveUninitialized: true, // evita crear sessions innecesarias
+    saveUninitialized: false, // false = no crea sesión hasta que se use (ahorra memoria y evita DoS)
     cookie: {
-        secure: NODE_ENV === 'development', // true solo si usas HTTPS
-        ttpOnly: true,
+        secure: NODE_ENV === 'production', // true solo si usas HTTPS (en producción)
+        httpOnly: true,
         maxAge: 1000 * 60 // 1 minuto el resultado de la multiplicación es 60,000 milisegundos, que es igual a 1 minuto.
         //maxAge: 1000 * 60 * 60 // 1 hora el resultado de la multiplicación es 3,600,000 milisegundos, que es igual a 1 hora.
         //maxAge: 1000 * 60 * 60 * 24 // 1 día
@@ -143,12 +142,10 @@ app.use(session({
 // INICIALIZACIÓN DE SECUTITY MIDDLEWARE
 
 // Debe ir ANTES de las rutas
+// NOTA: Se omite whitelistParams en el middleware global para no bloquear endpoints
+// con campos distintos (password, id_tipousuario, etc.). Cada controlador valida sus propios campos.
 app.use(securityMiddleware({
-  mode: "reject",
-  whitelistParams: [
-    "nombre", "email", "telefono", "direccion",
-    "id_estado", "id_municipio"
-  ]
+  mode: "reject"
 }));
 
 
@@ -232,17 +229,6 @@ app.use((req, res) => {
 });
 
 
-// Middleware Global para Errores
-app.use((err, req, res) => {
-    console.error("🔥 Error interno:", err);
-
-    return res.status(500).json({
-        success: false,
-        message: "Error interno del servidor",
-        error: NODE_ENV === "development" ? err.message : undefined
-    });
-});
-
 // Middleware Global de Errores
 app.use(errorMiddleware);
 
@@ -251,10 +237,14 @@ app.use(errorMiddleware);
 // ********************************************************************************************
 // INICIO DEL SERVIDOR
 
-app.listen(PORT, async () => {
+// Conectar la BD primero y luego iniciar el servidor
+// Esto garantiza que el servidor no acepte peticiones si la BD no está disponible
+(async () => {
     await connection();
-    console.log(`Server is running on http://localhost:${ PORT }`);
-});
+    app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${ PORT }`);
+    });
+})();
 
 export default app;
 
