@@ -205,16 +205,6 @@ app.use('/api/v1/serviciosproveedores', serviciosproveedoresRouter);
 app.use('/api/v1/tiposserviciosproveedores', tiposserviciosproveedoresRouter);
 
 
-
-
-
-
-
-
-
-
-
-
 // ********************************************************************************************
 // ********************************************************************************************
 // MIDDLEWARE GLOBAL PARA RUTAS NO ENCONTRADAS Y ERRORES
