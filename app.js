@@ -50,7 +50,7 @@ import tiposserviciosproveedoresRouter from './routes/proveedores/tiposservicios
 
 // importar accesorios
 import cookieParser from 'cookie-parser';
-import session from "express-session";
+// import session from "express-session";
 import { SESSION_SECRET, NODE_ENV } from './config/env.js';
 
 // importar CORS middleware personalizado
@@ -61,6 +61,11 @@ import { errorMiddleware } from "./middleware/error.middleware.js";
 
 // importar security middleware personalizado
 import securityMiddleware from "./middleware/security.middleware.js";
+
+// importar session middleware personalizado
+import session from 'express-session';
+import SequelizeStore from 'connect-session-sequelize';
+import { sequelize } from './database/mysql.js';
 
 // ********************************************************************************************
 // ********************************************************************************************
@@ -123,20 +128,46 @@ app.use(corsMiddleware());
 // ********************************************************************************************
 // INICIALIZACIÓN DE SESSION MIDDLEWARE
 
+// Crear store con Sequelize
+const SequelizeSessionStore = SequelizeStore(session.Store);
+const sessionStore = new SequelizeSessionStore({
+    db: sequelize,
+    tableName: 'Sessions',           // nombre de la tabla que se creará automáticamente
+    checkExpirationInterval: 15 * 60 * 1000, // cada 15 min limpia sesiones expiradas
+    expiration: 24 * 60 * 60 * 1000   // duración de la sesión (1 día)
+});
+
+// Crear la tabla si no existe (sincronización)
+sessionStore.sync();
+
+// Reemplazar la configuración de session
 app.use(session({
     name: 'amigo',
-    secret: SESSION_SECRET || 'keyboard_cat_dev',
+    secret: SESSION_SECRET,
     resave: false,
-    saveUninitialized: false, // false = no crea sesión hasta que se use (ahorra memoria y evita DoS)
+    saveUninitialized: false,
+    store: sessionStore,               // ← añadir el store
     cookie: {
-        secure: NODE_ENV === 'production', // true solo si usas HTTPS (en producción)
+        secure: NODE_ENV === 'production',
         httpOnly: true,
-        maxAge: 1000 * 60 * 20 // 20 minutos el resultado de la multiplicación es 1,200,000 milisegundos, que es igual a 20 minutos.
-        //maxAge: 1000 * 60 // 1 minuto el resultado de la multiplicación es 60,000 milisegundos, que es igual a 1 minuto.
-        //maxAge: 1000 * 60 * 60 // 1 hora el resultado de la multiplicación es 3,600,000 milisegundos, que es igual a 1 hora.
-        //maxAge: 1000 * 60 * 60 * 24 // 1 día
+        maxAge: 24 * 60 * 60 * 1000   // 1 día
     }
 }));
+
+// app.use(session({
+//     name: 'amigo',
+//     secret: SESSION_SECRET || 'keyboard_cat_dev',
+//     resave: false,
+//     saveUninitialized: false, // false = no crea sesión hasta que se use (ahorra memoria y evita DoS)
+//     cookie: {
+//         secure: NODE_ENV === 'production', // true solo si usas HTTPS (en producción)
+//         httpOnly: true,
+//         maxAge: 1000 * 60 * 20 // 20 minutos el resultado de la multiplicación es 1,200,000 milisegundos, que es igual a 20 minutos.
+//         //maxAge: 1000 * 60 // 1 minuto el resultado de la multiplicación es 60,000 milisegundos, que es igual a 1 minuto.
+//         //maxAge: 1000 * 60 * 60 // 1 hora el resultado de la multiplicación es 3,600,000 milisegundos, que es igual a 1 hora.
+//         //maxAge: 1000 * 60 * 60 * 24 // 1 día
+//     }
+// }));
 
 // ********************************************************************************************
 // ********************************************************************************************
