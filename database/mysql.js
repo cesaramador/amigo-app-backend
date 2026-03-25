@@ -10,9 +10,9 @@ if(!DATABASE && !HOST && !USER && !PASSWORD) {
 // Create the connection to database with sequelize
 const sequelize = new Sequelize(DATABASE, USER, PASSWORD, {
     host: HOST,
-    USER,
-    PASSWORD,
-    DATABASE,
+    //DATABASE,
+    //USER,
+    //PASSWORD,
     port: 3306,
     dialect: 'mysql',
     logging: console.log,

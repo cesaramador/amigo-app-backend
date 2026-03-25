@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "dev:prod": "nodemon app.js --env production"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

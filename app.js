@@ -117,7 +117,7 @@ app.use((req, res, next) => {
 app.use(corsMiddleware());
 
 // Preflight global
-app.options("*", corsMiddleware());
+//app.options("*", corsMiddleware());
 
 // ********************************************************************************************
 // ********************************************************************************************
@@ -131,7 +131,8 @@ app.use(session({
     cookie: {
         secure: NODE_ENV === 'production', // true solo si usas HTTPS (en producción)
         httpOnly: true,
-        maxAge: 1000 * 60 // 1 minuto el resultado de la multiplicación es 60,000 milisegundos, que es igual a 1 minuto.
+        maxAge: 1000 * 60 * 20 // 20 minutos el resultado de la multiplicación es 1,200,000 milisegundos, que es igual a 20 minutos.
+        //maxAge: 1000 * 60 // 1 minuto el resultado de la multiplicación es 60,000 milisegundos, que es igual a 1 minuto.
         //maxAge: 1000 * 60 * 60 // 1 hora el resultado de la multiplicación es 3,600,000 milisegundos, que es igual a 1 hora.
         //maxAge: 1000 * 60 * 60 * 24 // 1 día
     }
