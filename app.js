@@ -236,6 +236,16 @@ app.use('/api/v1/publicaciones', publicacionesRouter);
 app.use('/api/v1/serviciosproveedores', serviciosproveedoresRouter);
 app.use('/api/v1/tiposserviciosproveedores', tiposserviciosproveedoresRouter);
 
+// ********************************************************************************************
+// ********************************************************************************************
+// RUTA PRINCIPAL
+app.use('/', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Bienvenido a la API de Amigo App",
+        path: req.originalUrl
+    });
+});
 
 // ********************************************************************************************
 // ********************************************************************************************
@@ -249,7 +259,6 @@ app.use((req, res) => {
         path: req.originalUrl
     });
 });
-
 
 // Middleware Global de Errores
 app.use(errorMiddleware);

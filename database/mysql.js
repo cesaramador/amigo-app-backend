@@ -1,18 +1,18 @@
 //import mysql from 'mysql2/promise'; 
-import { NODE_ENV, HOST, USER, PASSWORD, DATABASE } from '../config/env.js';
+import { NODE_ENV, HOST, DB_USER, DB_PASSWORD, DATABASE } from '../config/env.js';
 import { Sequelize } from 'sequelize';
 //import { MySqlDialect } from '@sequelize/mysql';
 
-if(!DATABASE && !HOST && !USER && !PASSWORD) {
+if(!DATABASE && !HOST && !DB_USER && !DB_PASSWORD) {
     throw new Error('Please define the Database enviroment variable inside .env.<development|production>.local');
 }
 
 // Create the connection to database with sequelize
-const sequelize = new Sequelize(DATABASE, USER, PASSWORD, {
+const sequelize = new Sequelize(DATABASE, DB_USER, DB_PASSWORD, {
     host: HOST,
     //DATABASE,
-    //USER,
-    //PASSWORD,
+    //DB_USER,
+    //DB_PASSWORD,
     port: 3306,
     dialect: 'mysql',
     logging: console.log,
