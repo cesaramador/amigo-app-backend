@@ -5,7 +5,7 @@ import Usuario from '../../models/usuarios/usuarios.model.js';
 import Matrizacceso from '../../models/matriz/matrizacceso.model.js';
 import Municipios from "../../models/usuarios/municipios.model.js";
 import { sequelize } from '../../database/mysql.js';
-import { JWT_EXPIRES_IN, JWT_SECRET, SMTP_HOST, SMTP_USER, SMTP_PASS } from '../../config/env.js';
+import { JWT_EXPIRES_IN, JWT_SECRET, SMTP_HOST, SMTP_USER, SMTP_PASS, NODE_ENV } from '../../config/env.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -198,8 +198,17 @@ export const iniciar = async (req, res) => {
             return res.status(401).json({ success: false, message: "Credenciales incorrectas." });
         }
 
-        const token_init = { id: user.telefono_personal };
-        const token = jwt.sign(token_init, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        // const token_init = { id: user.telefono_personal };
+        const sessionId = req.sessionID;
+        const payload = {
+            id_usuario: user.id_usuario,
+            id_tipousuario: user.id_tipousuario,
+            telefono_personal: user.telefono_personal,
+            sessionId: sessionId
+        };
+
+        // const token = jwt.sign(token_init, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
         // Remover campos sensibles
         const userSafe = user.get({ plain: true });
@@ -210,16 +219,21 @@ export const iniciar = async (req, res) => {
             httpOnly: true,
             secure: false, // -> true en producción con TLS
             sameSite: "lax",
-            maxAge: 300000 // 5 min
+            maxAge: 300000 * 10 // 1 hora
         });
 
         // NOTA: Asegurarse de que el middleware express-session esté configurado en app.js
         if (req.session) {
+            // req.session.amigo = req.sessionID;
+            // req.session.usuario = user.telefono_personal;
             req.session.amigo = req.sessionID;
             req.session.usuario = user.telefono_personal;
+            req.session.id_usuario = user.id_usuario;
+            req.session.id_tipousuario = user.id_tipousuario;
         }
-        const idSession = req.session?.amigo || 'No session set';
-        const userSession = req.session?.usuario || 'No session set';
+        
+        // const idSession = req.session?.amigo || 'No session set';
+        // const userSession = req.session?.usuario || 'No session set';
 
         // Obtener matriz de acceso
         let matrizacceso = [];
@@ -234,9 +248,14 @@ export const iniciar = async (req, res) => {
             success: true,
             message: "Inicio de sesión exitoso.",
             data: {
+                // token,
+                // idSession,
+                // userSession,
+                // matrizacceso,
+                // user: userSafe
                 token,
-                idSession,
-                userSession,
+                idSession: req.sessionID,
+                userSession: user.telefono_personal,
                 matrizacceso,
                 user: userSafe
             }
@@ -252,23 +271,52 @@ export const iniciar = async (req, res) => {
 // POST /api/v1/auth/abandonar
 // Endpoint de cierre de sesión (Logout)
 // ─────────────────────────────────────────────────────────────────────────────
+// export const abandonar = async (req, res) => {
+//     try {
+//         res.clearCookie("valor", { httpOnly: true, secure: false, sameSite: "lax" });
+
+//         // Destruir la sesión
+//         if (req.session) {
+//             req.session.destroy((err) => {
+//                 if (err) {
+//                     console.error("Error al destruir sesión:", err);
+//                     return res.status(500).json({ success: false, message: "No se pudo cerrar la sesión correctamente." });
+//                 }
+//                 // Limpiar cookie de sesión (connect.sid)
+//                 res.clearCookie("connect.sid", { httpOnly: true, secure: false, sameSite: "lax" });
+//                 return res.status(200).json({ success: true, message: "Sesión cerrada correctamente." });
+//             });
+//         } else {
+//             // Si no había sesión, igual respondemos ok
+//             return res.status(200).json({ success: true, message: "No había sesión activa, pero el cierre se procesó." });
+//         }
+
+//     } catch (error) {
+//         console.error("Error en abandonar():", error);
+//         return res.status(500).json({ success: false, message: "Error interno al cerrar sesión." });
+//     }
+// };
+
 export const abandonar = async (req, res) => {
     try {
-        res.clearCookie("valor", { httpOnly: true, secure: false, sameSite: "lax" });
+        // Limpiar cookie auxiliar
+        res.clearCookie("valor", { httpOnly: true, secure: NODE_ENV === 'production', sameSite: "lax" });
 
+        // Destruir la sesión
         if (req.session) {
             req.session.destroy((err) => {
                 if (err) {
                     console.error("Error al destruir sesión:", err);
                     return res.status(500).json({ success: false, message: "No se pudo cerrar la sesión correctamente." });
                 }
-                res.clearCookie("connect.sid", { httpOnly: true, secure: false, sameSite: "lax" });
+                // Limpiar cookie de sesión (connect.sid)
+                res.clearCookie("connect.sid", { httpOnly: true, secure: NODE_ENV === 'production', sameSite: "lax" });
                 return res.status(200).json({ success: true, message: "Sesión cerrada correctamente." });
             });
         } else {
-            return res.status(200).json({ success: true, message: "No había sesión activa, pero el cierre se procesó." });
+            // Si no había sesión, igual respondemos ok
+            return res.status(200).json({ success: true, message: "No había sesión activa." });
         }
-
     } catch (error) {
         console.error("Error en abandonar():", error);
         return res.status(500).json({ success: false, message: "Error interno al cerrar sesión." });

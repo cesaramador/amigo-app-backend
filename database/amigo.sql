@@ -1,7 +1,8 @@
 -- ***************************************************************************************************
 -- CREAR BASE DE DATOS
 
-CREATE SCHEMA `amigo` DEFAULT CHARACTER SET utf8mb4;
+-- CREATE SCHEMA `amigo` DEFAULT CHARACTER SET utf8mb4;
+-- CREATE DATABASE `amigo` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 
 -- ***************************************************************************************************
 -- USAR BASE DE DATOS
@@ -75,7 +76,7 @@ CREATE TABLE Usuarios
     telefono_personal varchar(10) NOT NULL UNIQUE,
     telefono_contacto varchar(10),
     email varchar(200) NOT NULL UNIQUE,
-    codigo varchar(100) NOT NULL, -- código numérico aleatorio de 6 digitos generado por la app almacenar usando hash
+    codigo varchar(10) NOT NULL, -- código numérico aleatorio de 6 digitos generado por la app almacenar usando hash
     -- Domicilio
     id_estado int NOT NULL, 
     id_municipio int NOT NULL, -- **** SE SELECCIONA EL ESTADO PARA VISUALIZAR SUS MUNICIPIOS
@@ -85,7 +86,7 @@ CREATE TABLE Usuarios
     numero_ext varchar(15),
     codigo_postal varchar(5) NOT NULL,
     -- Datos proveedor (requisito para proveedores)
-    razon_social varchar(200),
+    razon_social varchar(500),
     rfc varchar(15),
     -- Otros campos
     fecha_registro date NOT NULL,
@@ -116,7 +117,7 @@ CREATE TABLE Usuarios
 CREATE TABLE Vistas
 (
 	id_vista int AUTO_INCREMENT PRIMARY KEY NOT NULL,
-	vista varchar(20) NOT NULL
+	vista varchar(50) NOT NULL
 );
 
 -- Tabla de Matriz de accesos
@@ -139,14 +140,14 @@ CREATE TABLE MatrizAccesos
 CREATE TABLE TiposGrupos
 (
 	id_tipogrupo int AUTO_INCREMENT PRIMARY KEY NOT NULL,
-	tipo_grupo varchar(30) NOT NULL UNIQUE -- danza, manualidades, etc.
+	tipo_grupo varchar(100) NOT NULL UNIQUE -- danza, manualidades, etc.
 );
 
 -- TABLA # 10
 CREATE TABLE Grupos
 (
 	id_grupo int AUTO_INCREMENT PRIMARY KEY NOT NULL,
-	nombre_grupo varchar(100) NOT NULL,
+	nombre_grupo varchar(200) NOT NULL,
     id_tipogrupo int ,
     CONSTRAINT FK_Id_GrupoTipoGrupo FOREIGN KEY (id_tipogrupo) 
 		REFERENCES TiposGrupos (id_tipogrupo) MATCH SIMPLE ON UPDATE CASCADE ON DELETE RESTRICT
@@ -217,7 +218,7 @@ CREATE TABLE Asistencias
 CREATE TABLE TiposEncuestas
 (
 	id_tipoencuesta int AUTO_INCREMENT PRIMARY KEY NOT NULL,
-    tipo_encuesta varchar(30) NOT NULL -- psicológica, médica, terapeútica, etc
+    tipo_encuesta varchar(50) NOT NULL -- psicológica, médica, terapeútica, etc
 );
 
 -- TABLA # 16
@@ -441,116 +442,118 @@ CREATE INDEX Idx_Publicacion ON Publicaciones (id_publicacion, id_proveedorconse
 -- INSERTS
 /*
 USE amigo;
-SELECT * FROM generos;
-SELECT * FROM tiposusuarios;
-SELECT * FROM estatususuarios;
-SELECT * FROM categoriasviviendas;
-SELECT * FROM estados;
-SELECT * FROM municipios;
-SELECT * FROM usuarios;
+SELECT * FROM Generos;
+SELECT * FROM TiposUsuarios;
+SELECT * FROM EstatusUsuarios;
+SELECT * FROM CategoriasViviendas;
+SELECT * FROM Estados;
+SELECT * FROM Municipios;
+SELECT * FROM Usuarios;
 SELECT * FROM Vistas;
 SELECT * FROM MatrizAccesos;
 
 -- BORRAR TABLA USUARIOS
 USE amigo;
-TRUNCATE generos;
-TRUNCATE tiposusuarios;
-TRUNCATE estatususuarios;
-TRUNCATE categoriasviviendas;
-TRUNCATE estados;
-TRUNCATE municipios;
-TRUNCATE usuarios;
+TRUNCATE Generos;
+TRUNCATE TiposUsuarios;
+TRUNCATE EstatusUsuarios;
+TRUNCATE CategoriasViviendas;
+TRUNCATE Estados;
+TRUNCATE Municipios;
+TRUNCATE Usuarios;
 TRUNCATE Vistas;
 TRUNCATE MatrizAccesos;
 
 -- REINICIAR AUTOINCREMENTABLE
 USE amigo;
-ALTER TABLE generos AUTO_INCREMENT = 1;
-ALTER TABLE tiposusuarios AUTO_INCREMENT = 1;
-ALTER TABLE estatususuarios AUTO_INCREMENT = 1;
-ALTER TABLE categoriasviviendas AUTO_INCREMENT = 1;
-ALTER TABLE estados AUTO_INCREMENT = 1;
-ALTER TABLE municipios AUTO_INCREMENT = 1;
-ALTER TABLE usuarios AUTO_INCREMENT = 1;
-ALTER TABLE vistas AUTO_INCREMENT = 1;
-ALTER TABLE matrizaccesos AUTO_INCREMENT = 1;
+ALTER TABLE Generos AUTO_INCREMENT = 1;
+ALTER TABLE TiposUsuarios AUTO_INCREMENT = 1;
+ALTER TABLE EstatusUsuarios AUTO_INCREMENT = 1;
+ALTER TABLE CategoriasViviendas AUTO_INCREMENT = 1;
+ALTER TABLE Estados AUTO_INCREMENT = 1;
+ALTER TABLE Municipios AUTO_INCREMENT = 1;
+ALTER TABLE Usuarios AUTO_INCREMENT = 1;
+ALTER TABLE Vistas AUTO_INCREMENT = 1;
+ALTER TABLE MatrizAccesos AUTO_INCREMENT = 1;
+
+*/
 
 -- INSERT INTO table_name (column1, column2, column3) VALUES (value1, value2, value3);
 -- INSERTAR ESTATUS MARITAL soltero/a, casado/a, viudo/a, divorciado/a, separado/a, 
 USE amigo;
-insert into estatusmaritales (estatus_marital) values ('soltero/a');
-insert into estatusmaritales (estatus_marital) values ('casado/a');
-insert into estatusmaritales (estatus_marital) values ('divorciado/a');
-insert into estatusmaritales (estatus_marital) values ('separado/a');
-insert into estatusmaritales (estatus_marital) values ('viudo/a');
+insert into EstatusMaritales (estatus_marital) values ('soltero/a');
+insert into EstatusMaritales (estatus_marital) values ('casado/a');
+insert into EstatusMaritales (estatus_marital) values ('divorciado/a');
+insert into EstatusMaritales (estatus_marital) values ('separado/a');
+insert into EstatusMaritales (estatus_marital) values ('viudo/a');
 
 
 -- INSERTAR GENEROS
 USE amigo;
-insert into generos (genero) values ('masculino');
-insert into generos (genero) values ('femenino');
+insert into Generos (genero) values ('masculino');
+insert into Generos (genero) values ('femenino');
 
 
 -- INSERTAR TIPOS USUARIOS
 USE amigo;
-insert into tiposusuarios (tipo_usuario) values ('administrador/a');
-insert into tiposusuarios (tipo_usuario) values ('asesor/a');
-insert into tiposusuarios (tipo_usuario) values ('usuario/a');
-insert into tiposusuarios (tipo_usuario) values ('proveedor/a');
+insert into TiposUsuarios (tipo_usuario) values ('administrador/a');
+insert into TiposUsuarios (tipo_usuario) values ('asesor/a');
+insert into TiposUsuarios (tipo_usuario) values ('usuario/a');
+insert into TiposUsuarios (tipo_usuario) values ('proveedor/a');
 
 
 -- INSERTAR ESTATUS DE USUARIOS
 USE amigo;
-insert into estatususuarios (estatus_usuario) values ('pendiente');
-insert into estatususuarios (estatus_usuario) values ('activo');
-insert into estatususuarios (estatus_usuario) values ('inactivo');
-insert into estatususuarios (estatus_usuario) values ('suspendido');
-insert into estatususuarios (estatus_usuario) values ('eliminado');
+insert into EstatusUsuarios (estatus_usuario) values ('activo');
+insert into EstatusUsuarios (estatus_usuario) values ('inactivo');
+insert into EstatusUsuarios (estatus_usuario) values ('pendiente');
+insert into EstatusUsuarios (estatus_usuario) values ('suspendido');
+insert into EstatusUsuarios (estatus_usuario) values ('eliminado');
 
 
 -- INSERTAR CATEGORIAS DE VIVIENDAS
 USE amigo;
-insert into categoriasviviendas (categoria_vivienda) values ('propia');
-insert into categoriasviviendas (categoria_vivienda) values ('prestada');
-insert into categoriasviviendas (categoria_vivienda) values ('rentada');
+insert into CategoriasViviendas (categoria_vivienda) values ('propia');
+insert into CategoriasViviendas (categoria_vivienda) values ('prestada');
+insert into CategoriasViviendas (categoria_vivienda) values ('rentada');
 
 
 -- INSERTAR ESTADOS
 -- IMPORTAR DATOS DEL ARCHIVO catalogo_entidades.csv
 -- O MANUALMENTE
 USE amigo;
-insert into estados (estado) values ('aguascalientes');
-insert into estados (estado) values ('baja california');
-insert into estados (estado) values ('baja california sur');
-insert into estados (estado) values ('campeche');
-insert into estados (estado) values ('coahuila');
-insert into estados (estado) values ('colima');
-insert into estados (estado) values ('chiapas');
-insert into estados (estado) values ('chihuahua');
-insert into estados (estado) values ('ciudad de mexico');
-insert into estados (estado) values ('durango');
-insert into estados (estado) values ('guanajuato');
-insert into estados (estado) values ('guerrero');
-insert into estados (estado) values ('hidalgo');
-insert into estados (estado) values ('jalisco');
-insert into estados (estado) values ('mexico');
-insert into estados (estado) values ('michoacan');
-insert into estados (estado) values ('morelos');
-insert into estados (estado) values ('nayarit');
-insert into estados (estado) values ('nuevo leon');
-insert into estados (estado) values ('oaxaca');
-insert into estados (estado) values ('puebla');
-insert into estados (estado) values ('queretaro');
-insert into estados (estado) values ('quintana roo');
-insert into estados (estado) values ('san luis potosi');
-insert into estados (estado) values ('sinaloa');
-insert into estados (estado) values ('sonora');
-insert into estados (estado) values ('tabasco');
-insert into estados (estado) values ('tamaulipas');
-insert into estados (estado) values ('tlaxcala');
-insert into estados (estado) values ('veracruz');
-insert into estados (estado) values ('yucatan');
-insert into estados (estado) values ('zacatecas');
+insert into Estados (estado) values ('aguascalientes');
+insert into Estados (estado) values ('baja california');
+insert into Estados (estado) values ('baja california sur');
+insert into Estados (estado) values ('campeche');
+insert into Estados (estado) values ('coahuila');
+insert into Estados (estado) values ('colima');
+insert into Estados (estado) values ('chiapas');
+insert into Estados (estado) values ('chihuahua');
+insert into Estados (estado) values ('ciudad de mexico');
+insert into Estados (estado) values ('durango');
+insert into Estados (estado) values ('guanajuato');
+insert into Estados (estado) values ('guerrero');
+insert into Estados (estado) values ('hidalgo');
+insert into Estados (estado) values ('jalisco');
+insert into Estados (estado) values ('mexico');
+insert into Estados (estado) values ('michoacan');
+insert into Estados (estado) values ('morelos');
+insert into Estados (estado) values ('nayarit');
+insert into Estados (estado) values ('nuevo leon');
+insert into Estados (estado) values ('oaxaca');
+insert into Estados (estado) values ('puebla');
+insert into Estados (estado) values ('queretaro');
+insert into Estados (estado) values ('quintana roo');
+insert into Estados (estado) values ('san luis potosi');
+insert into Estados (estado) values ('sinaloa');
+insert into Estados (estado) values ('sonora');
+insert into Estados (estado) values ('tabasco');
+insert into Estados (estado) values ('tamaulipas');
+insert into Estados (estado) values ('tlaxcala');
+insert into Estados (estado) values ('veracruz');
+insert into Estados (estado) values ('yucatan');
+insert into Estados (estado) values ('zacatecas');
 
 
 -- INSERTAR MUNICIPIOS
@@ -559,14 +562,16 @@ insert into estados (estado) values ('zacatecas');
 
 -- SELECT DATE('2003-12-31 01:02:03');
 -- INSERTAR USUARIOS
+/*
 USE amigo;
-INSERT INTO usuarios (
+INSERT INTO Usuarios (
 	id_tipousuario, nombre, ap_paterno, ap_materno, fecha_nacimiento, telefono_personal, telefono_contacto, email, codigo,
     id_estado, id_municipio, colonia, calle, numero_int, numero_ext, codigo_postal, razon_social, rfc, fecha_registro,
     id_genero, id_estatus_usuario, id_estatus_marital, id_categoria_vivienda
-    ) VALUES (1, 'cesar', 'amador', 'sanchez', '1972-04-30', '3123201211', '3123201211', 'cesar.amador@outlook.com', '123456',
-				6, 1, 'colonia', 'calle', '38', '1', '28000', 'ninguno', 'rfc_1', '2025-10-13',
+    ) VALUES (1, 'cesar', 'amador', 'sanchez', '1972-04-30', '3123201211', '3123201211', 'cesar.amador@outlook.com', '1972',
+				6, 1, 'Centenario', 'Gral Lauro Villar', '853', '0', '28984', 'dextrati', 'sace720430', '2026-03-23',
                 1, 1, 1, 1);
+
 INSERT INTO usuarios (
 	id_tipousuario, nombre, ap_paterno, ap_materno, fecha_nacimiento, telefono_personal, telefono_contacto, email, codigo,
     id_estado, id_municipio, colonia, calle, numero_int, numero_ext, codigo_postal, razon_social, rfc, fecha_registro,
@@ -591,17 +596,15 @@ INSERT INTO usuarios (
 
 -- INSERTAR VISTAS
 USE amigo;
-insert into vistas (vista) values ('vista_1');
-insert into vistas (vista) values ('vista_2');
-insert into vistas (vista) values ('vista_3');
+insert into vistas (vista) values ('encuestas');
+insert into vistas (vista) values ('proveedores');
+insert into vistas (vista) values ('grupos');
 
 -- INSERTAR MATRIZ DE ACCESOS
 USE amigo;
 insert into matrizaccesos (id_tipousuario, id_vista, estatus) values (1, 1, 1);
 insert into matrizaccesos (id_tipousuario, id_vista, estatus) values (1, 2, 1);
 insert into matrizaccesos (id_tipousuario, id_vista, estatus) values (1, 3, 1);
-
-
 
 SELECT VERSION();
 -- '10.4.32-MariaDB'
