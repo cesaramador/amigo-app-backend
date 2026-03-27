@@ -132,7 +132,10 @@ export const registrar = async (req, res) => {
         }
 
         // Generar código de 5 dígitos y hashearlo
-        const codigoPlain = Math.floor(10000 + Math.random() * 90000).toString();
+        //const codigoPlain = Math.floor(10000 + Math.random() * 90000).toString();
+        
+        // Generar código de 6 dígitos y hashearlo
+        const codigoPlain = Math.floor(100000 + Math.random() * 900000).toString();
         const codigoHash = await bcrypt.hash(codigoPlain, 10);
 
         payload.codigo = codigoHash;
