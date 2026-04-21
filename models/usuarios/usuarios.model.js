@@ -43,9 +43,9 @@ const Usuarios = sequelize.define('Usuarios', {
         allowNull: false,
         unique: true
     },
-    // Almacena hash bcrypt (~60 chars); se usa VARCHAR(255) para margen
+    // Hash bcrypt del código (~60 chars); columna BD: codigo varchar(100) NOT NULL
     codigo: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(100),
         allowNull: false
     },
     id_estado: {

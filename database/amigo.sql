@@ -76,7 +76,7 @@ CREATE TABLE Usuarios
     telefono_personal varchar(10) NOT NULL UNIQUE,
     telefono_contacto varchar(10),
     email varchar(200) NOT NULL UNIQUE,
-    codigo varchar(10) NOT NULL, -- código numérico aleatorio de 6 digitos generado por la app almacenar usando hash
+    codigo varchar(100) NOT NULL, -- código numérico aleatorio de 6 digitos generado por la app almacenar usando hash
     -- Domicilio
     id_estado int NOT NULL, 
     id_municipio int NOT NULL, -- **** SE SELECCIONA EL ESTADO PARA VISUALIZAR SUS MUNICIPIOS

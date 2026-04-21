@@ -1,109 +1,14 @@
 import Usuario from "../../models/usuarios/usuarios.model.js";
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
-import { SMTP_HOST, SMTP_USER, SMTP_PASS } from '../../config/env.js';
 import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Extraer longitudes máximas desde rawAttributes del modelo
-const getModelMaxLengths = () => {
-    const attrs = Usuario.rawAttributes || {};
-    const maxLengths = {};
-    for (const [name, meta] of Object.entries(attrs)) {
-        const len = meta.type?.options?.length;
-        if (len) maxLengths[name] = len;
-    }
-    return maxLengths;
-};
-
-// Regex de validación
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const TEL_RE   = /^[\d+\-\s()]+$/;
-
-// Campos de la lista blanca para escritura (excluye PK y fecha_registro)
-const ALLOWED_WRITE_FIELDS = [
-    'id_tipousuario', 'nombre', 'ap_paterno', 'ap_materno', 'fecha_nacimiento',
-    'telefono_personal', 'telefono_contacto', 'email',
-    'id_estado', 'id_municipio', 'colonia', 'calle', 'numero_int', 'numero_ext',
-    'codigo_postal', 'razon_social', 'rfc',
-    'id_genero', 'id_estatus_usuario', 'id_estatus_marital', 'id_categoria_vivienda'
-];
-
-// Construir payload seguro desde req.body, solo campos en whitelist
-const buildPayload = (body, allowedFields) => {
-    const payload = {};
-    for (const key of allowedFields) {
-        if (Object.prototype.hasOwnProperty.call(body, key)) {
-            const val = body[key];
-            if (val !== null && typeof val === 'object') {
-                throw Object.assign(new TypeError(`Campo malformado: ${key}`), { statusCode: 400 });
-            }
-            payload[key] = val;
-        }
-    }
-    return payload;
-};
-
-// Validar formato de email y teléfono
-const validateFormats = (payload, maxLengths) => {
-    const errors = [];
-    if (payload.email !== undefined) {
-        if (!payload.email || !EMAIL_RE.test(String(payload.email))) {
-            errors.push({ field: 'email', reason: 'Formato de email inválido.' });
-        }
-    }
-    if (payload.telefono_personal !== undefined) {
-        const tel = String(payload.telefono_personal || '');
-        const maxTel = maxLengths.telefono_personal ?? 10;
-        if (!TEL_RE.test(tel) || tel.length > maxTel) {
-            errors.push({ field: 'telefono_personal', reason: `Formato inválido o excede ${maxTel} caracteres.` });
-        }
-    }
-    if (payload.telefono_contacto !== undefined && payload.telefono_contacto) {
-        const tel = String(payload.telefono_contacto);
-        const maxTel = maxLengths.telefono_contacto ?? 10;
-        if (!TEL_RE.test(tel) || tel.length > maxTel) {
-            errors.push({ field: 'telefono_contacto', reason: `Formato inválido o excede ${maxTel} caracteres.` });
-        }
-    }
-    // Validar longitudes de campos STRING
-    for (const [field, maxLen] of Object.entries(maxLengths)) {
-        if (payload[field] !== undefined && payload[field] !== null) {
-            const str = String(payload[field]);
-            if (str.length > maxLen) {
-                errors.push({ field, reason: `No puede exceder ${maxLen} caracteres.` });
-            }
-        }
-    }
-    return errors;
-};
-
-// Enviar correo con código de verificación (fire-and-forget, no bloquea la respuesta)
-const sendVerificationEmail = (toEmail, nombre, codigoPlain) => {
-    (async () => {
-        try {
-            const transporter = nodemailer.createTransport({
-                service: SMTP_HOST,
-                auth: { user: SMTP_USER, pass: SMTP_PASS }
-            });
-            await transporter.sendMail({
-                from: SMTP_USER,
-                to: toEmail,
-                subject: 'Código de acceso inicial App Amigo',
-                html: `
-                    <p>Hola ${nombre},</p>
-                    <p>Tu código para tu acceso es:</p>
-                    <h2>${codigoPlain}</h2>
-                    <p>Este código solo será necesario en tu primer inicio de sesión.</p>
-                `
-            });
-        } catch (e) {
-            console.warn('No se pudo enviar el correo de verificación:', e.message);
-        }
-    })();
-};
+import {
+    ALLOWED_WRITE_FIELDS,
+    buildPayload,
+    getModelMaxLengths,
+    validateFormats
+} from '../../helpers/usuario-registro-payload.js';
+import { persistirNuevoUsuarioConCodigo } from '../../services/usuario-alta.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/usuarios
@@ -202,6 +107,9 @@ export const usuarioPost = async (req, res, next) => {
 
         // Construir payload con lista blanca
         const payload = buildPayload(req.body, ALLOWED_WRITE_FIELDS);
+        if (payload.email !== undefined && payload.email !== null) {
+            payload.email = String(payload.email).trim().toLowerCase();
+        }
 
         // Validar campos obligatorios según modelo (allowNull: false sin defaultValue ni PK)
         const attrs = Usuario.rawAttributes || {};
@@ -223,52 +131,7 @@ export const usuarioPost = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Errores de formato en los datos.', fields: formatErrors });
         }
 
-        // Generar código de 5 dígitos y hashearlo ANTES de la transacción
-        const codigoPlain = Math.floor(10000 + Math.random() * 90000).toString();
-        const codigoHash  = await bcrypt.hash(codigoPlain, 10);
-
-        // Asignar fecha de registro y código hasheado
-        payload.codigo         = codigoHash;
-        payload.fecha_registro = new Date();
-
-        // Verificación de unicidad + creación en una sola transacción atómica
-        const nuevousuario = await sequelize.transaction(async (t) => {
-            // Verificar unicidad de email
-            if (payload.email) {
-                const existsEmail = await Usuario.findOne({
-                    where: { email: payload.email },
-                    transaction: t
-                });
-                if (existsEmail) {
-                    const err = new Error('El email ya está registrado.');
-                    err.statusCode = 409;
-                    err.field = 'email';
-                    throw err;
-                }
-            }
-            // Verificar unicidad de telefono_personal
-            if (payload.telefono_personal) {
-                const existsTel = await Usuario.findOne({
-                    where: { telefono_personal: payload.telefono_personal },
-                    transaction: t
-                });
-                if (existsTel) {
-                    const err = new Error('El teléfono personal ya está registrado.');
-                    err.statusCode = 409;
-                    err.field = 'telefono_personal';
-                    throw err;
-                }
-            }
-
-            return await Usuario.create(payload, { transaction: t });
-        });
-
-        // Preparar respuesta segura (sin exponer codigo/hash)
-        const userSafe = nuevousuario.get({ plain: true });
-        delete userSafe.codigo;
-
-        // Enviar correo con código en texto plano (fire-and-forget)
-        sendVerificationEmail(payload.email, payload.nombre, codigoPlain);
+        const { userSafe } = await persistirNuevoUsuarioConCodigo(payload);
 
         return res.status(201).json({
             success: true,

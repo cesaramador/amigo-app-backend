@@ -1,106 +1,18 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
 import Usuario from '../../models/usuarios/usuarios.model.js';
 import Matrizacceso from '../../models/matriz/matrizacceso.model.js';
 import Municipios from "../../models/usuarios/municipios.model.js";
 import { sequelize } from '../../database/mysql.js';
-import { JWT_EXPIRES_IN, JWT_SECRET, SMTP_HOST, SMTP_USER, SMTP_PASS, NODE_ENV } from '../../config/env.js';
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const TEL_RE   = /^[\d+\-\s()]+$/;
-
-const ALLOWED_WRITE_FIELDS = [
-    'id_tipousuario', 'nombre', 'ap_paterno', 'ap_materno', 'fecha_nacimiento',
-    'telefono_personal', 'telefono_contacto', 'email',
-    'id_estado', 'id_municipio', 'colonia', 'calle', 'numero_int', 'numero_ext',
-    'codigo_postal', 'razon_social', 'rfc',
-    'id_genero', 'id_estatus_usuario', 'id_estatus_marital', 'id_categoria_vivienda'
-];
-
-const getModelMaxLengths = () => {
-    const attrs = Usuario.rawAttributes || {};
-    const maxLengths = {};
-    for (const [name, meta] of Object.entries(attrs)) {
-        const len = meta.type?.options?.length;
-        if (len) maxLengths[name] = len;
-    }
-    return maxLengths;
-};
-
-const buildPayload = (body, allowedFields) => {
-    const payload = {};
-    for (const key of allowedFields) {
-        if (Object.prototype.hasOwnProperty.call(body, key)) {
-            const val = body[key];
-            if (val !== null && typeof val === 'object') {
-                throw Object.assign(new TypeError(`Campo malformado: ${key}`), { statusCode: 400 });
-            }
-            payload[key] = val;
-        }
-    }
-    return payload;
-};
-
-const validateFormats = (payload, maxLengths) => {
-    const errors = [];
-    if (payload.email !== undefined) {
-        if (!payload.email || !EMAIL_RE.test(String(payload.email))) {
-            errors.push({ field: 'email', reason: 'Formato de email inválido.' });
-        }
-    }
-    if (payload.telefono_personal !== undefined) {
-        const tel = String(payload.telefono_personal || '');
-        const maxTel = maxLengths.telefono_personal ?? 10;
-        if (!TEL_RE.test(tel) || tel.length > maxTel) {
-            errors.push({ field: 'telefono_personal', reason: `Formato inválido o excede ${maxTel} caracteres.` });
-        }
-    }
-    if (payload.telefono_contacto !== undefined && payload.telefono_contacto) {
-        const tel = String(payload.telefono_contacto);
-        const maxTel = maxLengths.telefono_contacto ?? 10;
-        if (!TEL_RE.test(tel) || tel.length > maxTel) {
-            errors.push({ field: 'telefono_contacto', reason: `Formato inválido o excede ${maxTel} caracteres.` });
-        }
-    }
-    // Validar longitudes de campos STRING
-    for (const [field, maxLen] of Object.entries(maxLengths)) {
-        if (payload[field] !== undefined && payload[field] !== null) {
-            const str = String(payload[field]);
-            if (str.length > maxLen) {
-                errors.push({ field, reason: `No puede exceder ${maxLen} caracteres.` });
-            }
-        }
-    }
-    return errors;
-};
-
-const sendVerificationEmail = (toEmail, nombre, codigoPlain) => {
-    (async () => {
-        try {
-            const transporter = nodemailer.createTransport({
-                service: SMTP_HOST,
-                auth: { user: SMTP_USER, pass: SMTP_PASS }
-            });
-            await transporter.sendMail({
-                from: SMTP_USER,
-                to: toEmail,
-                subject: 'Código de acceso inicial App Amigo',
-                html: `
-                    <p>Hola ${nombre},</p>
-                    <p>Tu código para tu acceso es:</p>
-                    <h2>${codigoPlain}</h2>
-                    <p>Este código solo será necesario en tu primer inicio de sesión.</p>
-                `
-            });
-        } catch (e) {
-            console.warn('No se pudo enviar el correo de verificación:', e.message);
-        }
-    })();
-};
-
+import { JWT_EXPIRES_IN, JWT_SECRET, NODE_ENV } from '../../config/env.js';
+import { generarCodigoAccesoPlain, sendRecoveryCodeEmail } from '../../helpers/codigo-acceso-email.js';
+import {
+    ALLOWED_WRITE_FIELDS,
+    buildPayload,
+    getModelMaxLengths,
+    validateFormats
+} from '../../helpers/usuario-registro-payload.js';
+import { persistirNuevoUsuarioConCodigo } from '../../services/usuario-alta.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/auth/registrar
@@ -109,9 +21,18 @@ const sendVerificationEmail = (toEmail, nombre, codigoPlain) => {
 export const registrar = async (req, res) => {
     try {
         const maxLengths = getModelMaxLengths();
-        const payload = buildPayload(req.body, ALLOWED_WRITE_FIELDS);
+        let payload;
+        try {
+            payload = buildPayload(req.body, ALLOWED_WRITE_FIELDS);
+        } catch (e) {
+            const code = e.statusCode || 400;
+            return res.status(code).json({ success: false, message: e.message || 'Solicitud inválida.' });
+        }
 
-        // Validar campos obligatorios
+        if (payload.email !== undefined && payload.email !== null) {
+            payload.email = String(payload.email).trim().toLowerCase();
+        }
+
         const attrs = Usuario.rawAttributes || {};
         const requiredFields = Object.keys(attrs).filter(name => {
             const m = attrs[name];
@@ -125,54 +46,22 @@ export const registrar = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Faltan campos obligatorios.', fields: missing });
         }
 
-        // Validar formatos
         const formatErrors = validateFormats(payload, maxLengths);
         if (formatErrors.length) {
             return res.status(400).json({ success: false, message: 'Errores de formato en los datos.', fields: formatErrors });
         }
 
-        // Generar código de 5 dígitos y hashearlo
-        //const codigoPlain = Math.floor(10000 + Math.random() * 90000).toString();
-        
-        // Generar código de 6 dígitos y hashearlo
-        const codigoPlain = Math.floor(100000 + Math.random() * 900000).toString();
-        const codigoHash = await bcrypt.hash(codigoPlain, 10);
-
-        payload.codigo = codigoHash;
-        payload.fecha_registro = new Date();
-
-        // Guardar con verificación atómica de duplicados
-        const nuevousuario = await sequelize.transaction(async (t) => {
-            if (payload.email) {
-                const e = await Usuario.findOne({ where: { email: payload.email }, transaction: t });
-                if (e) { const err = new Error('El email ya está registrado.'); err.statusCode = 409; throw err; }
-            }
-            if (payload.telefono_personal) {
-                const tel = await Usuario.findOne({ where: { telefono_personal: payload.telefono_personal }, transaction: t });
-                if (tel) { const err = new Error('El teléfono personal ya está registrado.'); err.statusCode = 409; throw err; }
-            }
-            return await Usuario.create(payload, { transaction: t });
-        });
-
-        // ⚠️ IMPORTANTE: Nunca devolver el token en el registro si el flujo exige validar el código primero,
-        // ni tampoco el código (hash/plain) por seguridad.
-        const userSafe = nuevousuario.get({ plain: true });
-        delete userSafe.codigo;
-
-        sendVerificationEmail(payload.email, payload.nombre, codigoPlain);
+        const { userSafe } = await persistirNuevoUsuarioConCodigo(payload);
 
         return res.status(201).json({
             success: true,
             message: 'Usuario registrado correctamente. Se ha enviado un código de verificación por email.',
-            data: {
-                user: userSafe
-            }
-            // NOTA: Se ha eliminado expresamente la exposición del código y del token en la respuesta.
+            data: { user: userSafe }
         });
 
     } catch (error) {
         if (error.statusCode === 409 || error.statusCode === 400) {
-            return res.status(error.statusCode).json({ success: false, message: error.message });
+            return res.status(error.statusCode).json({ success: false, message: error.message, field: error.field });
         }
         console.error("Error en registrarUsuario:", error);
         return res.status(500).json({ success: false, message: "Error interno en registro." });
@@ -220,7 +109,7 @@ export const iniciar = async (req, res) => {
         // Establecer cookies y sesión
         res.cookie("valor", "true", {
             httpOnly: true,
-            secure: false, // -> true en producción con TLS
+            secure: NODE_ENV === 'production',
             sameSite: "lax",
             maxAge: 300000 * 10 // 1 hora
         });
@@ -267,6 +156,48 @@ export const iniciar = async (req, res) => {
     } catch (error) {
         console.error("Error en iniciar sesión:", error);
         return res.status(500).json({ success: false, message: "Error interno en el inicio de sesión." });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/v1/auth/recuperar-codigo
+// Recupera y regenera código de acceso por teléfono + email
+// ─────────────────────────────────────────────────────────────────────────────
+export const recuperarCodigo = async (req, res) => {
+    try {
+        const telefono_personal = String(req.body.telefono_personal).trim();
+        const email = String(req.body.email).trim().toLowerCase();
+
+        const codigoPlain = generarCodigoAccesoPlain();
+        const codigoHash = await bcrypt.hash(codigoPlain, 10);
+
+        const updated = await sequelize.transaction(async (t) => {
+            const record = await Usuario.findOne({
+                where: { telefono_personal, email },
+                transaction: t
+            });
+            if (!record) return null;
+            await record.update({ codigo: codigoHash }, { transaction: t });
+            return record;
+        });
+
+        // Respuesta neutra para no exponer si existe o no la cuenta
+        if (!updated) {
+            return res.status(200).json({
+                success: true,
+                message: "Si los datos coinciden con una cuenta registrada, recibirás un código de acceso por correo."
+            });
+        }
+
+        sendRecoveryCodeEmail(updated.email, updated.nombre, codigoPlain);
+
+        return res.status(200).json({
+            success: true,
+            message: "Si los datos coinciden con una cuenta registrada, recibirás un código de acceso por correo."
+        });
+    } catch (error) {
+        console.error("Error en recuperarCodigo:", error);
+        return res.status(500).json({ success: false, message: "Error interno al recuperar el código de acceso." });
     }
 };
 

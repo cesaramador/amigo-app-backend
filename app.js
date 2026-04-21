@@ -1,6 +1,5 @@
 // importar módulos necesarios y variables de entorno
 import express from 'express';
-import { PORT } from './config/env.js';
 
 // importar conexión a la base de datos
 import connection from './database/mysql.js';
@@ -10,6 +9,7 @@ import authRouter from './routes/login/auth.routes.js';
 
 // importar rutas para usuarios
 import usuarioRouter from './routes/usuarios/usuarios.routes.js';
+import registroPublicoRouter from './routes/usuarios/registro-publico.routes.js';
 import generoRouter from './routes/usuarios/generos.routes.js';
 import estadoRouter from './routes/usuarios/estados.routes.js';
 import municipioRouter from './routes/usuarios/municipios.routes.js';
@@ -51,7 +51,7 @@ import tiposserviciosproveedoresRouter from './routes/proveedores/tiposservicios
 // importar accesorios
 import cookieParser from 'cookie-parser';
 // import session from "express-session";
-import { SESSION_SECRET, NODE_ENV } from './config/env.js';
+import { SESSION_SECRET, NODE_ENV, PORT } from './config/env.js';
 
 // importar CORS middleware personalizado
 import { corsMiddleware } from './middleware/corsmiddleware.js';
@@ -72,6 +72,11 @@ import { sequelize } from './database/mysql.js';
 // INICIALIZACIÓN DE EXPRESS
 
 const app = express();
+
+// Tras Nginx/Ingress en VPS: IP real y cookies `secure` coherentes
+if (NODE_ENV === 'production' || process.env.TRUST_PROXY === '1') {
+    app.set('trust proxy', 1);
+}
 
 // ********************************************************************************************
 // ********************************************************************************************
@@ -190,6 +195,9 @@ app.use(securityMiddleware({
 // registrar rutas para autenticación
 app.use('/api/v1/auth', authRouter);
 
+// registro público de usuarios (sin token)
+app.use('/api/v1/registro-publico', registroPublicoRouter);
+
 // registrar vista
 app.use('/api/v1/vistas', vistaRouter);
 
@@ -238,8 +246,8 @@ app.use('/api/v1/tiposserviciosproveedores', tiposserviciosproveedoresRouter);
 
 // ********************************************************************************************
 // ********************************************************************************************
-// RUTA PRINCIPAL
-app.use('/', (req, res) => {
+// Ruta raíz (solo GET /). No usar app.use('/') para no interceptar /api/v1/... inexistentes.
+app.get('/', (req, res) => {
     res.status(200).json({
         success: true,
         message: "Bienvenido a la API de Amigo App",
@@ -273,7 +281,7 @@ app.use(errorMiddleware);
 (async () => {
     await connection();
     app.listen(PORT, () => {
-        console.log(`Server is running on http://localhost:${ PORT }`);
+        console.log(`Server listening on port ${PORT} (${NODE_ENV})`);
     });
 })();
 
