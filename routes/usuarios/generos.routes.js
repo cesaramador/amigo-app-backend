@@ -13,7 +13,7 @@ const generoRouter = Router();
 
 // path : /api/v1/generos (GET)
 // leer todos los generos
-generoRouter.get('/', autorizaAcceso, generosGet);
+generoRouter.get('/', generosGet);
 
 // path : /api/v1/generos (GET)
 // leer un genero por id

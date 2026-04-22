@@ -13,7 +13,7 @@ const tiposusuarioRouter = Router();
 
 // path : /api/v1/tiposusuarios (GET)
 // leer todos los tipos de usuarios
-tiposusuarioRouter.get('/', autorizaAcceso, tiposusuariosGet);
+tiposusuarioRouter.get('/', tiposusuariosGet);
 
 // path : /api/v1/tiposusuarios (GET)
 // leer un tipo de usuario por id

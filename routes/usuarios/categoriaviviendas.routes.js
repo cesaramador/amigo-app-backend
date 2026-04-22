@@ -13,7 +13,7 @@ const categoriaviviendaRouter = Router();
 
 // path : /api/v1/categoriasviviendas (GET)
 // leer todos las categorias de viviendas
-categoriaviviendaRouter.get('/', autorizaAcceso, categoriasviviendasGet);
+categoriaviviendaRouter.get('/', categoriasviviendasGet);
 
 // path : /api/v1/categoriasviviendas (GET)
 // leer una categoria de vivienda por id

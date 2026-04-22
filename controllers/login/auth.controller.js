@@ -1,8 +1,14 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import Usuario from '../../models/usuarios/usuarios.model.js';
+import TiposUsuarios from '../../models/usuarios/tiposusuarios.model.js';
 import Matrizacceso from '../../models/matriz/matrizacceso.model.js';
+import Estados from "../../models/usuarios/estados.model.js";
 import Municipios from "../../models/usuarios/municipios.model.js";
+import Generos from "../../models/usuarios/generos.model.js";
+import EstatusUsuarios from "../../models/usuarios/estatususuarios.model.js";
+import EstatusMaritales from "../../models/usuarios/estatusmaritales.model.js";
+import CategoriasViviendas from "../../models/usuarios/categoriasviviendas.model.js";
 import { sequelize } from '../../database/mysql.js';
 import { JWT_EXPIRES_IN, JWT_SECRET, NODE_ENV } from '../../config/env.js';
 import { generarCodigoAccesoPlain, sendRecoveryCodeEmail } from '../../helpers/codigo-acceso-email.js';
@@ -285,5 +291,146 @@ export const obtenerMunicipiosPorEstado = async (req, res) => {
     } catch (error) {
         console.error("Error al obtener municipios:", error.message || error);
         return res.status(500).json({ success: false, message: "Error interno al consultar municipios." });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/auth/tipos-usuarios
+// Catálogo público de tipos de usuario para registro
+// ─────────────────────────────────────────────────────────────────────────────
+export const obtenerTiposUsuariosPublicos = async (_req, res) => {
+    try {
+        const tipos = await TiposUsuarios.findAll({
+            attributes: ["id_tipousuario", "tipo_usuario"],
+            order: [["id_tipousuario", "ASC"]]
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Tipos de usuario encontrados",
+            total_registros: tipos.length,
+            data: tipos
+        });
+    } catch (error) {
+        console.error("Error al obtener tipos de usuario:", error.message || error);
+        return res.status(500).json({
+            success: false,
+            message: "Error interno al consultar tipos de usuario."
+        });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/auth/estados
+// Catálogo público de estados para registro
+// ─────────────────────────────────────────────────────────────────────────────
+export const obtenerEstadosPublicos = async (_req, res) => {
+    try {
+        const estados = await Estados.findAll({
+            attributes: ["id_estado", "estado"],
+            order: [["estado", "ASC"]]
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Estados encontrados",
+            total_registros: estados.length,
+            data: estados
+        });
+    } catch (error) {
+        console.error("Error al obtener estados:", error.message || error);
+        return res.status(500).json({ success: false, message: "Error interno al consultar estados." });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/auth/generos
+// Catálogo público de géneros para registro
+// ─────────────────────────────────────────────────────────────────────────────
+export const obtenerGenerosPublicos = async (_req, res) => {
+    try {
+        const generos = await Generos.findAll({
+            attributes: ["id_genero", "genero"],
+            order: [["id_genero", "ASC"]]
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Géneros encontrados",
+            total_registros: generos.length,
+            data: generos
+        });
+    } catch (error) {
+        console.error("Error al obtener géneros:", error.message || error);
+        return res.status(500).json({ success: false, message: "Error interno al consultar géneros." });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/auth/estatus-usuarios
+// Catálogo público de estatus de usuario para registro
+// ─────────────────────────────────────────────────────────────────────────────
+export const obtenerEstatusUsuariosPublicos = async (_req, res) => {
+    try {
+        const estatus = await EstatusUsuarios.findAll({
+            attributes: ["id_estatususuario", "estatus_usuario"],
+            order: [["id_estatususuario", "ASC"]]
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Estatus de usuario encontrados",
+            total_registros: estatus.length,
+            data: estatus
+        });
+    } catch (error) {
+        console.error("Error al obtener estatus de usuario:", error.message || error);
+        return res.status(500).json({ success: false, message: "Error interno al consultar estatus de usuario." });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/auth/estatus-maritales
+// Catálogo público de estatus marital para registro
+// ─────────────────────────────────────────────────────────────────────────────
+export const obtenerEstatusMaritalesPublicos = async (_req, res) => {
+    try {
+        const estatus = await EstatusMaritales.findAll({
+            attributes: ["id_estatusmarital", "estatus_marital"],
+            order: [["id_estatusmarital", "ASC"]]
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Estatus maritales encontrados",
+            total_registros: estatus.length,
+            data: estatus
+        });
+    } catch (error) {
+        console.error("Error al obtener estatus maritales:", error.message || error);
+        return res.status(500).json({ success: false, message: "Error interno al consultar estatus maritales." });
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/auth/categorias-viviendas
+// Catálogo público de categorías de vivienda para registro
+// ─────────────────────────────────────────────────────────────────────────────
+export const obtenerCategoriasViviendasPublicas = async (_req, res) => {
+    try {
+        const categorias = await CategoriasViviendas.findAll({
+            attributes: ["id_categoriavivienda", "categoria_vivienda"],
+            order: [["id_categoriavivienda", "ASC"]]
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Categorías de vivienda encontradas",
+            total_registros: categorias.length,
+            data: categorias
+        });
+    } catch (error) {
+        console.error("Error al obtener categorías de vivienda:", error.message || error);
+        return res.status(500).json({ success: false, message: "Error interno al consultar categorías de vivienda." });
     }
 };

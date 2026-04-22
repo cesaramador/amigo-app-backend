@@ -13,7 +13,7 @@ const municipioRouter = Router();
 
 // path : /api/v1/municipios (GET)
 // leer todos los municipios
-municipioRouter.get('/', autorizaAcceso, municipiosGet);
+municipioRouter.get('/', municipiosGet);
 
 // path : /api/v1/municipios (GET)
 // leer un municipio por id

@@ -13,7 +13,7 @@ const estatusmaritalRouter = Router();
 
 // path : /api/v1/estatusmaritales (GET)
 // leer todos los estatus maritales
-estatusmaritalRouter.get('/', autorizaAcceso, estatusmaritalesGet);
+estatusmaritalRouter.get('/', estatusmaritalesGet);
 
 // path : /api/v1/estatusmaritales (GET)
 // leer un estatus marital por id

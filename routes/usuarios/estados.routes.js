@@ -13,7 +13,7 @@ const estadoRouter = Router();
 
 // path : /api/v1/estados (GET)
 // leer todos los estados
-estadoRouter.get('/', autorizaAcceso, estadosGet);
+estadoRouter.get('/', estadosGet);
 
 // path : /api/v1/estados (GET)
 // leer un estado por id
