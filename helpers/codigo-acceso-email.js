@@ -33,7 +33,11 @@ export const sendVerificationEmail = (toEmail, nombre, codigoPlain) => {
                 `
             });
         } catch (e) {
-            console.warn('No se pudo enviar el correo de verificación:', e.message);
+            console.warn(
+                'No se pudo enviar el correo de verificación:',
+                e.code || 'NO_CODE',
+                e.message
+            );
         }
     })();
 };
@@ -54,7 +58,11 @@ export const sendRecoveryCodeEmail = (toEmail, nombre, codigoPlain) => {
                 `
             });
         } catch (e) {
-            console.warn('No se pudo enviar el correo de recuperación:', e.message);
+            console.warn(
+                'No se pudo enviar el correo de recuperación:',
+                e.code || 'NO_CODE',
+                e.message
+            );
         }
     })();
 };

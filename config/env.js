@@ -74,5 +74,19 @@ if (NODE_ENV === 'production') {
         process.exit(1);
     }
 
+    // Verificar SMTP en producción para evitar registros "exitosos" sin correo real.
+    const smtpRequired = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
+    const missingSmtp = smtpRequired.filter(v => !process.env[v] || String(process.env[v]).trim() === '');
+    if (missingSmtp.length > 0) {
+        console.error(`❌ Variables SMTP faltantes en producción: ${missingSmtp.join(', ')}`);
+        process.exit(1);
+    }
+
+    const smtpHostValue = String(process.env.SMTP_HOST || '').trim().toLowerCase();
+    if (smtpHostValue === 'gmail' || smtpHostValue === 'smtp.example.com') {
+        console.error(`❌ SMTP_HOST inválido para producción (${process.env.SMTP_HOST}). Usa un host real como smtp.gmail.com.`);
+        process.exit(1);
+    }
+
     console.log(`✅ Validaciones de producción completadas (puerto ${PORT}).`);
 }
