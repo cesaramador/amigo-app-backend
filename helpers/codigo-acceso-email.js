@@ -46,17 +46,7 @@ export const sendVerificationEmail = (toEmail, nombre, codigoPlain) => {
 export const sendRecoveryCodeEmail = (toEmail, nombre, codigoPlain) => {
     (async () => {
         try {
-            await sendMailAsync({
-                to: toEmail,
-                subject: 'Recuperación de código de acceso App Amigo',
-                html: `
-                    <p>Hola ${nombre},</p>
-                    <p>Solicitaste recuperar tu código de acceso.</p>
-                    <p>Tu nuevo código es:</p>
-                    <h2>${codigoPlain}</h2>
-                    <p>Si no realizaste esta solicitud, contacta al administrador.</p>
-                `
-            });
+            await sendRecoveryCodeEmailAsync(toEmail, nombre, codigoPlain);
         } catch (e) {
             console.warn(
                 'No se pudo enviar el correo de recuperación:',
@@ -65,4 +55,20 @@ export const sendRecoveryCodeEmail = (toEmail, nombre, codigoPlain) => {
             );
         }
     })();
+};
+
+/** Recuperación de código: espera el envío (para confirmar éxito o revertir cambios en BD). */
+export const sendRecoveryCodeEmailAsync = async (toEmail, nombre, codigoPlain) => {
+    const safeNombre = nombre && String(nombre).trim() ? String(nombre).trim() : 'Usuario';
+    await sendMailAsync({
+        to: toEmail,
+        subject: 'Recuperación de código de acceso App Amigo',
+        html: `
+                    <p>Hola ${safeNombre},</p>
+                    <p>Solicitaste recuperar tu código de acceso.</p>
+                    <p>Tu nuevo código es:</p>
+                    <h2>${codigoPlain}</h2>
+                    <p>Si no realizaste esta solicitud, contacta al administrador.</p>
+                `
+    });
 };

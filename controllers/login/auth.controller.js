@@ -9,9 +9,8 @@ import Generos from "../../models/usuarios/generos.model.js";
 import EstatusUsuarios from "../../models/usuarios/estatususuarios.model.js";
 import EstatusMaritales from "../../models/usuarios/estatusmaritales.model.js";
 import CategoriasViviendas from "../../models/usuarios/categoriasviviendas.model.js";
-import { sequelize } from '../../database/mysql.js';
 import { JWT_EXPIRES_IN, JWT_SECRET, NODE_ENV } from '../../config/env.js';
-import { generarCodigoAccesoPlain, sendRecoveryCodeEmail } from '../../helpers/codigo-acceso-email.js';
+import { generarCodigoAccesoPlain, sendRecoveryCodeEmailAsync } from '../../helpers/codigo-acceso-email.js';
 import {
     ALLOWED_WRITE_FIELDS,
     buildPayload,
@@ -169,37 +168,69 @@ export const iniciar = async (req, res) => {
 // POST /api/v1/auth/recuperar-codigo
 // Recupera y regenera código de acceso por teléfono + email
 // ─────────────────────────────────────────────────────────────────────────────
+const ID_ESTATUS_USUARIO_ACTIVO = 1;
+const TEXTO_ESTATUS_USUARIO_ACTIVO = "activo";
+
 export const recuperarCodigo = async (req, res) => {
     try {
         const telefono_personal = String(req.body.telefono_personal).trim();
         const email = String(req.body.email).trim().toLowerCase();
 
-        const codigoPlain = generarCodigoAccesoPlain();
-        const codigoHash = await bcrypt.hash(codigoPlain, 10);
-
-        const updated = await sequelize.transaction(async (t) => {
-            const record = await Usuario.findOne({
-                where: { telefono_personal, email },
-                transaction: t
-            });
-            if (!record) return null;
-            await record.update({ codigo: codigoHash }, { transaction: t });
-            return record;
+        const record = await Usuario.findOne({
+            where: { telefono_personal, email }
         });
 
-        // Respuesta neutra para no exponer si existe o no la cuenta
-        if (!updated) {
-            return res.status(200).json({
-                success: true,
-                message: "Si los datos coinciden con una cuenta registrada, recibirás un código de acceso por correo."
+        if (!record) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "El número celular y el correo no coinciden con una misma cuenta registrada. Revise ambos datos."
             });
         }
 
-        sendRecoveryCodeEmail(updated.email, updated.nombre, codigoPlain);
+        if (Number(record.id_estatus_usuario) !== ID_ESTATUS_USUARIO_ACTIVO) {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "No puede recuperar el código: su cuenta debe tener estatus de usuario activo (identificador 1). Su cuenta no cumple ese requisito."
+            });
+        }
+
+        const estatusRow = await EstatusUsuarios.findByPk(record.id_estatus_usuario);
+        const textoEstatus =
+            estatusRow?.estatus_usuario != null
+                ? String(estatusRow.estatus_usuario).trim().toLowerCase()
+                : "";
+
+        if (!estatusRow || textoEstatus !== TEXTO_ESTATUS_USUARIO_ACTIVO) {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "No puede recuperar el código: en el sistema el estatus de su usuario debe ser \"activo\" y el identificador 1. Consulte a un administrador si cree que es un error."
+            });
+        }
+
+        const codigoPlain = generarCodigoAccesoPlain();
+        const codigoHash = await bcrypt.hash(codigoPlain, 10);
+        const codigoAnterior = record.codigo;
+
+        await record.update({ codigo: codigoHash });
+
+        try {
+            await sendRecoveryCodeEmailAsync(record.email, record.nombre, codigoPlain);
+        } catch (mailErr) {
+            console.error("Error enviando correo de recuperación:", mailErr);
+            await record.update({ codigo: codigoAnterior });
+            return res.status(503).json({
+                success: false,
+                message:
+                    "No fue posible enviar el correo en este momento. Intente de nuevo más tarde. Si el problema continúa, contacte al administrador."
+            });
+        }
 
         return res.status(200).json({
             success: true,
-            message: "Si los datos coinciden con una cuenta registrada, recibirás un código de acceso por correo."
+            message: "Se generó un nuevo código de acceso y se envió a su correo electrónico."
         });
     } catch (error) {
         console.error("Error en recuperarCodigo:", error);
