@@ -249,7 +249,9 @@ export const abandonar = async (req, res) => {
                     console.error("Error al destruir sesión:", err);
                     return res.status(500).json({ success: false, message: "No se pudo cerrar la sesión correctamente." });
                 }
-                // Limpiar cookie de sesión (connect.sid)
+                // Limpiar cookie de sesión real configurada en app.js (name: 'amigo')
+                res.clearCookie("amigo", { httpOnly: true, secure: NODE_ENV === 'production', sameSite: "lax" });
+                // Compatibilidad por si existiera cookie por defecto en entornos previos.
                 res.clearCookie("connect.sid", { httpOnly: true, secure: NODE_ENV === 'production', sameSite: "lax" });
                 return res.status(200).json({ success: true, message: "Sesión cerrada correctamente." });
             });
