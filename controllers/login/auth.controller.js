@@ -19,6 +19,23 @@ import {
 } from '../../helpers/usuario-registro-payload.js';
 import { persistirNuevoUsuarioConCodigo } from '../../services/usuario-alta.service.js';
 
+/**
+ * Si el navegador llama al API desde otro origen (p. ej. localhost:8081 → amigo.dextrati.cloud),
+ * Set-Cookie / clearCookie con SameSite=Lax provoca avisos y el cliente ignora la cookie.
+ * En ese caso no enviamos clearCookie: la sesión ya se invalidó en el servidor con destroy().
+ */
+function isSameSiteAsApi(req) {
+    const host = String(req.get('host') || '').split(':')[0].toLowerCase();
+    const origin = req.get('origin');
+    if (!origin || !host) return true;
+    try {
+        const originHost = new URL(origin).hostname.toLowerCase();
+        return originHost === host;
+    } catch {
+        return true;
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/auth/registrar
 // Registra un nuevo usuario en el sistema.
@@ -270,8 +287,12 @@ export const recuperarCodigo = async (req, res) => {
 
 export const abandonar = async (req, res) => {
     try {
-        // Limpiar cookie auxiliar
-        res.clearCookie("valor", { httpOnly: true, secure: NODE_ENV === 'production', sameSite: "lax" });
+        const clearBrowserCookies = isSameSiteAsApi(req);
+        const cookieOpts = { httpOnly: true, secure: NODE_ENV === 'production', sameSite: "lax" };
+
+        if (clearBrowserCookies) {
+            res.clearCookie("valor", cookieOpts);
+        }
 
         // Destruir la sesión
         if (req.session) {
@@ -280,10 +301,10 @@ export const abandonar = async (req, res) => {
                     console.error("Error al destruir sesión:", err);
                     return res.status(500).json({ success: false, message: "No se pudo cerrar la sesión correctamente." });
                 }
-                // Limpiar cookie de sesión real configurada en app.js (name: 'amigo')
-                res.clearCookie("amigo", { httpOnly: true, secure: NODE_ENV === 'production', sameSite: "lax" });
-                // Compatibilidad por si existiera cookie por defecto en entornos previos.
-                res.clearCookie("connect.sid", { httpOnly: true, secure: NODE_ENV === 'production', sameSite: "lax" });
+                if (clearBrowserCookies) {
+                    res.clearCookie("amigo", cookieOpts);
+                    res.clearCookie("connect.sid", cookieOpts);
+                }
                 return res.status(200).json({ success: true, message: "Sesión cerrada correctamente." });
             });
         } else {
