@@ -105,12 +105,13 @@ export const iniciar = async (req, res) => {
 
         const user = await Usuario.findOne({ where: { telefono_personal } });
         if (!user) {
-            return res.status(401).json({ success: false, message: "Credenciales incorrectas." }); // Uso 401 para ocultar si existe
+            // 200 + success:false evita que el navegador marque el XHR como error en consola (401); el mensaje sigue siendo genérico.
+            return res.status(200).json({ success: false, message: "Credenciales incorrectas." });
         }
 
         const codigoValido = await bcrypt.compare(codigo, user.codigo);
         if (!codigoValido) {
-            return res.status(401).json({ success: false, message: "Credenciales incorrectas." });
+            return res.status(200).json({ success: false, message: "Credenciales incorrectas." });
         }
 
         // const token_init = { id: user.telefono_personal };
