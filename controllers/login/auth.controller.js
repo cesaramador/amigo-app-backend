@@ -202,7 +202,8 @@ export const recuperarCodigo = async (req, res) => {
         });
 
         if (!record) {
-            return res.status(400).json({
+            // 200 + success:false evita que el navegador marque el XHR como error en consola (400).
+            return res.status(200).json({
                 success: false,
                 message:
                     "El número celular y el correo no coinciden con una misma cuenta registrada. Revise ambos datos."
