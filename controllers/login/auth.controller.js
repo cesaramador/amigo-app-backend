@@ -22,7 +22,8 @@ import { persistirNuevoUsuarioConCodigo } from '../../services/usuario-alta.serv
 /**
  * Si el navegador llama al API desde otro origen (p. ej. localhost:8081 → amigo.dextrati.cloud),
  * Set-Cookie / clearCookie con SameSite=Lax provoca avisos y el cliente ignora la cookie.
- * En ese caso no enviamos clearCookie: la sesión ya se invalidó en el servidor con destroy().
+ * En login: no enviamos la cookie auxiliar "valor". En logout: no enviamos clearCookie;
+ * la sesión ya se invalidó en el servidor con destroy().
  */
 function isSameSiteAsApi(req) {
     const host = String(req.get('host') || '').split(':')[0].toLowerCase();
@@ -128,13 +129,15 @@ export const iniciar = async (req, res) => {
         const userSafe = user.get({ plain: true });
         delete userSafe.codigo;
 
-        // Establecer cookies y sesión
-        res.cookie("valor", "true", {
-            httpOnly: true,
-            secure: NODE_ENV === 'production',
-            sameSite: "lax",
-            maxAge: 300000 * 10 // 1 hora
-        });
+        // Cookie auxiliar solo en mismo sitio; cross-origin + SameSite=Lax la rechaza el navegador.
+        if (isSameSiteAsApi(req)) {
+            res.cookie("valor", "true", {
+                httpOnly: true,
+                secure: NODE_ENV === 'production',
+                sameSite: "lax",
+                maxAge: 300000 * 10 // 1 hora
+            });
+        }
 
         // NOTA: Asegurarse de que el middleware express-session esté configurado en app.js
         if (req.session) {
