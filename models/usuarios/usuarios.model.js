@@ -11,7 +11,8 @@ const Usuarios = sequelize.define('Usuarios', {
     },
     id_tipousuario: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        defaultValue: 3 // valor por defecto para usuario normal
     },
     nombre: {
         type: DataTypes.STRING(50),
@@ -94,7 +95,8 @@ const Usuarios = sequelize.define('Usuarios', {
     },
     id_estatus_usuario: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        defaultValue: 3 // valor por defecto para estatus pendiente
     },
     id_estatus_marital: {
         type: DataTypes.INTEGER,

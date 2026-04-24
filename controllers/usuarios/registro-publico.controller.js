@@ -4,7 +4,11 @@ import { persistirNuevoUsuarioConCodigo } from '../../services/usuario-alta.serv
 // Registro de usuario para el público (sin autorizaAcceso).
 export const registroPublicoPost = async (req, res, next) => {
     try {
-        const { userSafe } = await persistirNuevoUsuarioConCodigo(req.registroPublicoPayload);
+        const { userSafe } = await persistirNuevoUsuarioConCodigo({
+            ...req.registroPublicoPayload,
+            id_tipousuario: 3,
+            id_estatus_usuario: 3
+        });
         return res.status(201).json({
             success: true,
             message: 'Usuario registrado correctamente. Se ha enviado un código de verificación por email.',
