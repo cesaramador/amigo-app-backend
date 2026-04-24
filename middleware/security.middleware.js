@@ -19,7 +19,8 @@ const DEFAULTS = {
     "multipart/form-data"
   ],
   escapeHtmlOnSanitize: true,
-  maxRequestsPerMinute: 60   // 🆕 anti brute-force
+  // Registro público dispara varias peticiones GET en paralelo; en NAT móvil muchos usuarios comparten IP.
+  maxRequestsPerMinute: 180
 };
 
 /* ------------------ PATRONES AVANZADOS ------------------ */
