@@ -11,9 +11,9 @@ const DEFAULT_SORT_FIELD  = 'id_grupo';
 // ─────────────────────────────────────────────────────────────────────────────
 export const gruposGet = async (req, res, next) => {
     try {
-        // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        // Parametros ya validados/sanitizados por middleware
+        const page   = req.query.page || 1;
+        const limit  = req.query.limit || 10;
         const offset = (page - 1) * limit;
 
         // Filtros opcionales
@@ -25,11 +25,7 @@ export const gruposGet = async (req, res, next) => {
 
         // Filtrar por tipo de grupo
         if (req.query.id_tipogrupo !== undefined) {
-            const idTg = parseInt(req.query.id_tipogrupo, 10);
-            if (!Number.isInteger(idTg) || idTg <= 0) {
-                return res.status(400).json({ success: false, message: 'El parámetro id_tipogrupo debe ser un entero positivo' });
-            }
-            where.id_tipogrupo = idTg;
+            where.id_tipogrupo = req.query.id_tipogrupo;
         }
 
         // Ordenamiento seguro
@@ -65,10 +61,7 @@ export const gruposGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const grupoGetById = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         // Lectura simple: sin transacción explícita
         const grupo = await Grupos.findByPk(id);
@@ -90,33 +83,8 @@ export const grupoGetById = async (req, res, next) => {
 export const grupoPost = async (req, res, next) => {
     try {
         const { nombre_grupo, id_tipogrupo } = req.body;
-
-        // Validar nombre_grupo (obligatorio)
-        if (!nombre_grupo || typeof nombre_grupo !== 'string' || nombre_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo nombre_grupo es obligatorio' });
-        }
         const nombreValue = nombre_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = Grupos.rawAttributes || {};
-        const maxLength = attrs.nombre_grupo?.type?.options?.length
-                       ?? attrs.nombre_grupo?._length
-                       ?? 200;
-        if (nombreValue.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo nombre_grupo no puede exceder ${maxLength} caracteres`
-            });
-        }
-
-        // Validar id_tipogrupo (opcional, pero si se envía debe ser entero positivo)
-        let idTgValue = null;
-        if (id_tipogrupo !== undefined && id_tipogrupo !== null && id_tipogrupo !== '') {
-            idTgValue = parseInt(id_tipogrupo, 10);
-            if (!Number.isInteger(idTgValue) || idTgValue <= 0) {
-                return res.status(400).json({ success: false, message: 'El campo id_tipogrupo debe ser un entero positivo' });
-            }
-        }
+        const idTgValue = id_tipogrupo ?? null;
 
         // Verificar duplicado de nombre
         const exists = await Grupos.findOne({ where: { nombre_grupo: nombreValue } });
@@ -148,39 +116,10 @@ export const grupoPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const grupoPut = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
-
+        const { id } = req.params;
         const { nombre_grupo, id_tipogrupo } = req.body;
-
-        // Validar nombre_grupo (obligatorio en PUT)
-        if (!nombre_grupo || typeof nombre_grupo !== 'string' || nombre_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo nombre_grupo es obligatorio' });
-        }
         const nombreValue = nombre_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = Grupos.rawAttributes || {};
-        const maxLength = attrs.nombre_grupo?.type?.options?.length
-                       ?? attrs.nombre_grupo?._length
-                       ?? 200;
-        if (nombreValue.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo nombre_grupo no puede exceder ${maxLength} caracteres`
-            });
-        }
-
-        // Validar id_tipogrupo (opcional)
-        let idTgValue = null;
-        if (id_tipogrupo !== undefined && id_tipogrupo !== null && id_tipogrupo !== '') {
-            idTgValue = parseInt(id_tipogrupo, 10);
-            if (!Number.isInteger(idTgValue) || idTgValue <= 0) {
-                return res.status(400).json({ success: false, message: 'El campo id_tipogrupo debe ser un entero positivo' });
-            }
-        }
+        const idTgValue = id_tipogrupo ?? null;
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await Grupos.findByPk(id, { transaction: t });
@@ -224,55 +163,17 @@ export const grupoPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const grupoPatch = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
-
-        const camposPermitidos = ['nombre_grupo', 'id_tipogrupo'];
-        const camposRecibidos  = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
-
-        if (camposRecibidos.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Se requiere al menos uno de los campos: ${camposPermitidos.join(', ')}`
-            });
-        }
+        const { id } = req.params;
 
         // Construir objeto de cambios validados
         const cambios = {};
 
         if ('nombre_grupo' in req.body) {
-            const { nombre_grupo } = req.body;
-            if (typeof nombre_grupo !== 'string' || nombre_grupo.trim() === '') {
-                return res.status(400).json({ success: false, message: 'El campo nombre_grupo no es válido' });
-            }
-            const nombreValue = nombre_grupo.trim();
-
-            const attrs     = Grupos.rawAttributes || {};
-            const maxLength = attrs.nombre_grupo?.type?.options?.length
-                           ?? attrs.nombre_grupo?._length
-                           ?? 200;
-            if (nombreValue.length > maxLength) {
-                return res.status(400).json({
-                    success: false,
-                    message: `El campo nombre_grupo no puede exceder ${maxLength} caracteres`
-                });
-            }
-            cambios.nombre_grupo = nombreValue;
+            cambios.nombre_grupo = req.body.nombre_grupo.trim();
         }
 
         if ('id_tipogrupo' in req.body) {
-            const raw = req.body.id_tipogrupo;
-            if (raw === null || raw === '') {
-                cambios.id_tipogrupo = null; // permitir limpiar la FK
-            } else {
-                const idTgValue = parseInt(raw, 10);
-                if (!Number.isInteger(idTgValue) || idTgValue <= 0) {
-                    return res.status(400).json({ success: false, message: 'El campo id_tipogrupo debe ser un entero positivo o null' });
-                }
-                cambios.id_tipogrupo = idTgValue;
-            }
+            cambios.id_tipogrupo = req.body.id_tipogrupo;
         }
 
         const actualizado = await sequelize.transaction(async (t) => {
@@ -319,10 +220,7 @@ export const grupoPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const grupoDelete = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await Grupos.findByPk(id, { transaction: t });

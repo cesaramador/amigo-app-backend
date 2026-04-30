@@ -7,32 +7,38 @@ import { vistasGet,
     vistaDelete } 
     from '../../controllers/matriz/vistas.controller.js';
 import autorizaAcceso from '../../middleware/auth.middleware.js';
+import {
+    vistasGetValidation,
+    idVistaParamValidation,
+    vistaBodyRequiredValidation,
+    vistaBodyPatchValidation
+} from '../../middleware/matriz/vistas.validator.js';
 //import errormiddleware from '../../middleware/error.middleware.js';
 
 const vistaRouter = Router();
 
 // path : /api/v1/vistas (GET)
 // leer todos las vistas
-vistaRouter.get('/', autorizaAcceso, vistasGet);
+vistaRouter.get('/', autorizaAcceso, vistasGetValidation, vistasGet);
 
 // path : /api/v1/vistas (GET)
 // leer una categoria de vista
-vistaRouter.get('/:id', autorizaAcceso, vistaGetById);
+vistaRouter.get('/:id', autorizaAcceso, idVistaParamValidation, vistaGetById);
 
 // path : /api/v1/vistas (POST)
 // crear una nueva vista
-vistaRouter.post('/', autorizaAcceso, vistaPost);
+vistaRouter.post('/', autorizaAcceso, vistaBodyRequiredValidation, vistaPost);
 
 // path : /api/v1/vistas (PUT)
 // actualizar una vista por id
-vistaRouter.put('/:id', autorizaAcceso, vistaPut);
+vistaRouter.put('/:id', autorizaAcceso, idVistaParamValidation, vistaBodyRequiredValidation, vistaPut);
 
 // path : /api/v1/vistas (PATCH)
 // actualizar una vista por id
-vistaRouter.patch('/:id', autorizaAcceso, vistaPatch);
+vistaRouter.patch('/:id', autorizaAcceso, idVistaParamValidation, vistaBodyPatchValidation, vistaPatch);
 
 // path : /api/v1/vistas (DELETE)
 // eliminar una vista por id
-vistaRouter.delete('/:id', autorizaAcceso,vistaDelete);
+vistaRouter.delete('/:id', autorizaAcceso, idVistaParamValidation, vistaDelete);
 
 export default vistaRouter;

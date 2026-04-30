@@ -3,11 +3,11 @@ import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
 // Helper: obtener longitud máxima del atributo desde el modelo
-const getMaxLength = (field) => {
-    const attrs = CategoriasViviendas.rawAttributes || {};
+// const getMaxLength = (field) => {
+//    const attrs = CategoriasViviendas.rawAttributes || {};
     // DataTypes.STRING(n) guarda n en type.options.length
-    return attrs[field]?.type?.options?.length ?? 20;
-};
+//    return attrs[field]?.type?.options?.length ?? 20;
+//};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/categoriasviviendas
@@ -59,9 +59,6 @@ export const categoriasviviendasGet = async (req, res, next) => {
 export const categoriaviviendaGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const categoria = await CategoriasViviendas.findByPk(id);
 
@@ -82,23 +79,7 @@ export const categoriaviviendaGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const categoriaviviendaPost = async (req, res, next) => {
     try {
-        const { categoria_vivienda } = req.body;
-
-        // Validación de presencia y tipo
-        if (!categoria_vivienda || typeof categoria_vivienda !== 'string' || categoria_vivienda.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo categoria_vivienda es obligatorio y debe ser texto.' });
-        }
-
-        const value = categoria_vivienda.trim();
-
-        // Validación de longitud máxima desde el modelo
-        const maxLength = getMaxLength('categoria_vivienda');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo categoria_vivienda no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.categoria_vivienda).trim();
 
         // Verificación de duplicado + creación dentro de la misma transacción
         const nuevo = await sequelize.transaction(async (t) => {
@@ -136,24 +117,7 @@ export const categoriaviviendaPost = async (req, res, next) => {
 export const categoriaviviendaPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const { categoria_vivienda } = req.body;
-        if (!categoria_vivienda || typeof categoria_vivienda !== 'string' || categoria_vivienda.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo categoria_vivienda es obligatorio y debe ser texto.' });
-        }
-
-        const value = categoria_vivienda.trim();
-
-        const maxLength = getMaxLength('categoria_vivienda');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo categoria_vivienda no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.categoria_vivienda).trim();
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await CategoriasViviendas.findByPk(id, { transaction: t });
@@ -202,29 +166,7 @@ export const categoriaviviendaPut = async (req, res, next) => {
 export const categoriaviviendaPatch = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const { categoria_vivienda } = req.body;
-
-        // El campo es el único actualizable; debe estar presente
-        if (categoria_vivienda === undefined || categoria_vivienda === null) {
-            return res.status(400).json({ success: false, message: 'El campo categoria_vivienda es requerido.' });
-        }
-        if (typeof categoria_vivienda !== 'string' || categoria_vivienda.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo categoria_vivienda debe ser texto no vacío.' });
-        }
-
-        const value = categoria_vivienda.trim();
-
-        const maxLength = getMaxLength('categoria_vivienda');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo categoria_vivienda no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.categoria_vivienda).trim();
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await CategoriasViviendas.findByPk(id, { transaction: t });
@@ -275,9 +217,6 @@ export const categoriaviviendaPatch = async (req, res, next) => {
 export const categoriaviviendaDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const deleted = await sequelize.transaction(async (t) => {
             const record = await CategoriasViviendas.findByPk(id, { transaction: t });

@@ -16,7 +16,7 @@ const parsePositiveInt = (value) => {
 };
 
 // ─── Helper: validar formato de hora HH:MM o HH:MM:SS ────────────────────────
-const isValidTime = (value) => /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(value);
+// const isValidTime = (value) => /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(value);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /periodosgrupos  →  lista paginada con filtros y ordenamiento
@@ -33,14 +33,7 @@ export const periodosgruposGet = async (req, res, next) => {
         const fkFilters = ['id_grupo', 'id_periodo', 'id_estatus_grupo', 'id_responsable_grupo'];
         for (const field of fkFilters) {
             if (req.query[field] !== undefined) {
-                const val = parsePositiveInt(req.query[field]);
-                if (val === null) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `El parámetro ${field} debe ser un entero positivo`
-                    });
-                }
-                where[field] = val;
+                where[field] = parsePositiveInt(req.query[field]);
             }
         }
 
@@ -82,9 +75,6 @@ export const periodosgruposGet = async (req, res, next) => {
 export const periodosgrupoGetById = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
 
         // Lectura simple: sin transacción explícita
         const registro = await PeriodosGrupos.findByPk(id);
@@ -107,51 +97,25 @@ export const periodosgrupoPost = async (req, res, next) => {
     try {
         const { id_grupo, id_periodo, id_estatus_grupo, id_responsable_grupo, hora_inicio, lugar_imparticion } = req.body;
 
-        // id_estatus_grupo y id_responsable_grupo: obligatorios (allowNull: false en el modelo)
         const idEstatusGrupo    = parsePositiveInt(id_estatus_grupo);
         const idResponsableGrupo = parsePositiveInt(id_responsable_grupo);
 
-        if (idEstatusGrupo === null) {
-            return res.status(400).json({ success: false, message: 'El campo id_estatus_grupo es obligatorio y debe ser un entero positivo' });
-        }
-        if (idResponsableGrupo === null) {
-            return res.status(400).json({ success: false, message: 'El campo id_responsable_grupo es obligatorio y debe ser un entero positivo' });
-        }
-
-        // id_grupo e id_periodo: opcionales (allowNull: true en el modelo)
         let idGrupoVal = null, idPeriodoVal = null;
         if (id_grupo !== undefined && id_grupo !== null && id_grupo !== '') {
             idGrupoVal = parsePositiveInt(id_grupo);
-            if (idGrupoVal === null) {
-                return res.status(400).json({ success: false, message: 'El campo id_grupo debe ser un entero positivo' });
-            }
         }
         if (id_periodo !== undefined && id_periodo !== null && id_periodo !== '') {
             idPeriodoVal = parsePositiveInt(id_periodo);
-            if (idPeriodoVal === null) {
-                return res.status(400).json({ success: false, message: 'El campo id_periodo debe ser un entero positivo' });
-            }
         }
 
-        // hora_inicio: opcional — formato HH:MM o HH:MM:SS
         let horaInicioVal = null;
         if (hora_inicio !== undefined && hora_inicio !== null && hora_inicio !== '') {
-            if (!isValidTime(hora_inicio)) {
-                return res.status(400).json({ success: false, message: 'El campo hora_inicio debe tener formato HH:MM o HH:MM:SS' });
-            }
             horaInicioVal = hora_inicio;
         }
 
-        // lugar_imparticion: opcional — cadena máx. 250 caracteres
         let lugarImparticionVal = null;
         if (lugar_imparticion !== undefined && lugar_imparticion !== null && lugar_imparticion !== '') {
-            if (typeof lugar_imparticion !== 'string') {
-                return res.status(400).json({ success: false, message: 'El campo lugar_imparticion debe ser una cadena de texto' });
-            }
             lugarImparticionVal = lugar_imparticion.trim();
-            if (lugarImparticionVal.length > 250) {
-                return res.status(400).json({ success: false, message: 'El campo lugar_imparticion no puede exceder 250 caracteres' });
-            }
         }
 
         // Verificar duplicado de la combinación clave
@@ -199,57 +163,28 @@ export const periodosgrupoPost = async (req, res, next) => {
 export const periodosgrupoPut = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
 
         const { id_grupo, id_periodo, id_estatus_grupo, id_responsable_grupo, hora_inicio, lugar_imparticion } = req.body;
 
-        // Obligatorios en PUT
         const idEstatusGrupo     = parsePositiveInt(id_estatus_grupo);
         const idResponsableGrupo = parsePositiveInt(id_responsable_grupo);
 
-        if (idEstatusGrupo === null) {
-            return res.status(400).json({ success: false, message: 'El campo id_estatus_grupo es obligatorio y debe ser un entero positivo' });
-        }
-        if (idResponsableGrupo === null) {
-            return res.status(400).json({ success: false, message: 'El campo id_responsable_grupo es obligatorio y debe ser un entero positivo' });
-        }
-
-        // Opcionales (nullables)
         let idGrupoVal = null, idPeriodoVal = null;
         if (id_grupo !== undefined && id_grupo !== null && id_grupo !== '') {
             idGrupoVal = parsePositiveInt(id_grupo);
-            if (idGrupoVal === null) {
-                return res.status(400).json({ success: false, message: 'El campo id_grupo debe ser un entero positivo' });
-            }
         }
         if (id_periodo !== undefined && id_periodo !== null && id_periodo !== '') {
             idPeriodoVal = parsePositiveInt(id_periodo);
-            if (idPeriodoVal === null) {
-                return res.status(400).json({ success: false, message: 'El campo id_periodo debe ser un entero positivo' });
-            }
         }
 
-        // hora_inicio opcional
         let horaInicioVal = null;
         if (hora_inicio !== undefined && hora_inicio !== null && hora_inicio !== '') {
-            if (!isValidTime(hora_inicio)) {
-                return res.status(400).json({ success: false, message: 'El campo hora_inicio debe tener formato HH:MM o HH:MM:SS' });
-            }
             horaInicioVal = hora_inicio;
         }
 
-        // lugar_imparticion opcional
         let lugarImparticionVal = null;
         if (lugar_imparticion !== undefined && lugar_imparticion !== null && lugar_imparticion !== '') {
-            if (typeof lugar_imparticion !== 'string') {
-                return res.status(400).json({ success: false, message: 'El campo lugar_imparticion debe ser una cadena de texto' });
-            }
             lugarImparticionVal = lugar_imparticion.trim();
-            if (lugarImparticionVal.length > 250) {
-                return res.status(400).json({ success: false, message: 'El campo lugar_imparticion no puede exceder 250 caracteres' });
-            }
         }
 
         const actualizado = await sequelize.transaction(async (t) => {
@@ -311,24 +246,13 @@ export const periodosgrupoPut = async (req, res, next) => {
 export const periodosgrupoPatch = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
 
-        const camposPermitidos = [
-            'id_grupo', 'id_periodo', 'id_estatus_grupo',
-            'id_responsable_grupo', 'hora_inicio', 'lugar_imparticion'
-        ];
-        const camposRecibidos = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
+        // const camposPermitidos = [
+        //     'id_grupo', 'id_periodo', 'id_estatus_grupo',
+        //     'id_responsable_grupo', 'hora_inicio', 'lugar_imparticion'
+        // ];
+        // const camposRecibidos = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
 
-        if (camposRecibidos.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Se requiere al menos uno de los campos: ${camposPermitidos.join(', ')}`
-            });
-        }
-
-        // Construir objeto de cambios validados
         const cambios = {};
 
         // Claves foráneas enteras: id_grupo e id_periodo son nullables
@@ -338,7 +262,6 @@ export const periodosgrupoPatch = async (req, res, next) => {
                 cambios.id_grupo = null;
             } else {
                 const val = parsePositiveInt(raw);
-                if (val === null) return res.status(400).json({ success: false, message: 'El campo id_grupo debe ser un entero positivo o null' });
                 cambios.id_grupo = val;
             }
         }
@@ -348,19 +271,16 @@ export const periodosgrupoPatch = async (req, res, next) => {
                 cambios.id_periodo = null;
             } else {
                 const val = parsePositiveInt(raw);
-                if (val === null) return res.status(400).json({ success: false, message: 'El campo id_periodo debe ser un entero positivo o null' });
                 cambios.id_periodo = val;
             }
         }
         // Claves foráneas obligatorias (allowNull: false): si se envían, deben ser positivas
         if ('id_estatus_grupo' in req.body) {
             const val = parsePositiveInt(req.body.id_estatus_grupo);
-            if (val === null) return res.status(400).json({ success: false, message: 'El campo id_estatus_grupo debe ser un entero positivo' });
             cambios.id_estatus_grupo = val;
         }
         if ('id_responsable_grupo' in req.body) {
             const val = parsePositiveInt(req.body.id_responsable_grupo);
-            if (val === null) return res.status(400).json({ success: false, message: 'El campo id_responsable_grupo debe ser un entero positivo' });
             cambios.id_responsable_grupo = val;
         }
 
@@ -370,9 +290,6 @@ export const periodosgrupoPatch = async (req, res, next) => {
             if (raw === null || raw === '') {
                 cambios.hora_inicio = null;
             } else {
-                if (!isValidTime(raw)) {
-                    return res.status(400).json({ success: false, message: 'El campo hora_inicio debe tener formato HH:MM o HH:MM:SS' });
-                }
                 cambios.hora_inicio = raw;
             }
         }
@@ -383,13 +300,7 @@ export const periodosgrupoPatch = async (req, res, next) => {
             if (raw === null || raw === '') {
                 cambios.lugar_imparticion = null;
             } else {
-                if (typeof raw !== 'string') {
-                    return res.status(400).json({ success: false, message: 'El campo lugar_imparticion debe ser una cadena de texto' });
-                }
                 const trimmed = raw.trim();
-                if (trimmed.length > 250) {
-                    return res.status(400).json({ success: false, message: 'El campo lugar_imparticion no puede exceder 250 caracteres' });
-                }
                 cambios.lugar_imparticion = trimmed;
             }
         }
@@ -457,9 +368,6 @@ export const periodosgrupoPatch = async (req, res, next) => {
 export const periodosgrupoDelete = async (req, res, next) => {
     try {
         const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await PeriodosGrupos.findByPk(id, { transaction: t });

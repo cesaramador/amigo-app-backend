@@ -11,16 +11,16 @@ const ALLOWED_SORT_FIELDS = [
 const DEFAULT_SORT_FIELD = 'id_respuesta';
 
 // ─── Longitudes máximas derivadas del modelo ──────────────────────────────────
-const MAX_RESPUESTA = 500;
+// const MAX_RESPUESTA = 500;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /respuestas  →  lista paginada con búsqueda y ordenamiento
 // ─────────────────────────────────────────────────────────────────────────────
 export const respuestasGet = async (req, res, next) => {
     try {
-        // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page,  10) || 1);
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        // Parametros ya validados/sanitizados por middleware
+        const page   = req.query.page || 1;
+        const limit  = req.query.limit || 10;
         const offset = (page - 1) * limit;
 
         // Búsqueda por texto sobre el campo respuesta
@@ -29,14 +29,7 @@ export const respuestasGet = async (req, res, next) => {
 
         // Filtro opcional por id_estatus_enc_preg_resp
         if (req.query.id_estatus_enc_preg_resp !== undefined) {
-            const idEst = parseInt(req.query.id_estatus_enc_preg_resp, 10);
-            if (!Number.isInteger(idEst) || idEst <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El parámetro id_estatus_enc_preg_resp debe ser un entero positivo'
-                });
-            }
-            where.id_estatus_enc_preg_resp = idEst;
+            where.id_estatus_enc_preg_resp = req.query.id_estatus_enc_preg_resp;
         }
 
         // Ordenamiento seguro
@@ -72,13 +65,7 @@ export const respuestasGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const respuestaGetById = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         // Lectura simple: sin transacción explícita
         const registro = await Respuestas.findByPk(id);
@@ -103,30 +90,8 @@ export const respuestaGetById = async (req, res, next) => {
 export const respuestaPost = async (req, res, next) => {
     try {
         const { respuesta, id_estatus_enc_preg_resp } = req.body;
-
-        // ── Validación: respuesta ────────────────────────────────────────────
-        if (!respuesta || typeof respuesta !== 'string' || respuesta.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo respuesta es obligatorio'
-            });
-        }
         const respuestaVal = respuesta.trim();
-        if (respuestaVal.length > MAX_RESPUESTA) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo respuesta no puede exceder ${MAX_RESPUESTA} caracteres`
-            });
-        }
-
-        // ── Validación: id_estatus_enc_preg_resp ─────────────────────────────
-        const idEst = parseInt(id_estatus_enc_preg_resp, 10);
-        if (!Number.isInteger(idEst) || idEst <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_estatus_enc_preg_resp debe ser un entero positivo'
-            });
-        }
+        const idEst = id_estatus_enc_preg_resp;
 
         // Verificar duplicado: misma respuesta
         const exists = await Respuestas.findOne({ where: { respuesta: respuestaVal } });
@@ -164,39 +129,11 @@ export const respuestaPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const respuestaPut = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const { respuesta, id_estatus_enc_preg_resp } = req.body;
-
-        // ── Validación: respuesta ────────────────────────────────────────────
-        if (!respuesta || typeof respuesta !== 'string' || respuesta.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo respuesta es obligatorio'
-            });
-        }
         const respuestaVal = respuesta.trim();
-        if (respuestaVal.length > MAX_RESPUESTA) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo respuesta no puede exceder ${MAX_RESPUESTA} caracteres`
-            });
-        }
-
-        // ── Validación: id_estatus_enc_preg_resp ─────────────────────────────
-        const idEst = parseInt(id_estatus_enc_preg_resp, 10);
-        if (!Number.isInteger(idEst) || idEst <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_estatus_enc_preg_resp debe ser un entero positivo'
-            });
-        }
+        const idEst = id_estatus_enc_preg_resp;
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await Respuestas.findByPk(id, { transaction: t });
@@ -252,53 +189,20 @@ export const respuestaPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const respuestaPatch = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const { respuesta, id_estatus_enc_preg_resp } = req.body;
-
-        // Al menos un campo debe venir en el body
-        if (respuesta === undefined && id_estatus_enc_preg_resp === undefined) {
-            return res.status(400).json({
-                success: false,
-                message: 'Debe proporcionar al menos un campo para actualizar: respuesta, id_estatus_enc_preg_resp'
-            });
-        }
 
         // ── Validaciones de los campos presentes ─────────────────────────────
         const updates = {};
 
         if (respuesta !== undefined) {
-            if (typeof respuesta !== 'string' || respuesta.trim() === '') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo respuesta no es válido'
-                });
-            }
             const respuestaVal = respuesta.trim();
-            if (respuestaVal.length > MAX_RESPUESTA) {
-                return res.status(400).json({
-                    success: false,
-                    message: `El campo respuesta no puede exceder ${MAX_RESPUESTA} caracteres`
-                });
-            }
             updates.respuesta = respuestaVal;
         }
 
         if (id_estatus_enc_preg_resp !== undefined) {
-            const idEst = parseInt(id_estatus_enc_preg_resp, 10);
-            if (!Number.isInteger(idEst) || idEst <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_estatus_enc_preg_resp debe ser un entero positivo'
-                });
-            }
-            updates.id_estatus_enc_preg_resp = idEst;
+            updates.id_estatus_enc_preg_resp = id_estatus_enc_preg_resp;
         }
 
         const actualizado = await sequelize.transaction(async (t) => {
@@ -351,13 +255,7 @@ export const respuestaPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const respuestaDelete = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await Respuestas.findByPk(id, { transaction: t });

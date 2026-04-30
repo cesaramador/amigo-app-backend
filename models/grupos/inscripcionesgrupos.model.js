@@ -4,23 +4,52 @@ import { sequelize } from '../../database/mysql.js';  // Importante: importar { 
 const InscripcionesGrupos = sequelize.define('InscripcionesGrupos', {
     id_inscripciongrupo: {
         type: DataTypes.INTEGER,
-        AUTO_INCREMENT: true,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false
     },
     id_periodo_grupo: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'PeriodosGrupos',
+            key: 'id_periodogrupo'
+        }
     },
     id_usuario_inscrito: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'Usuarios',
+            key: 'id_usuario'
+        }
     }
 },
 {
     timestamps: false,
-    tableName: 'InscripcionesGrupos'
+    tableName: 'InscripcionesGrupos',
+    indexes: [
+        {
+            name: 'Idx_InscripcionGrupo',
+            fields: ['id_inscripciongrupo', 'id_periodo_grupo', 'id_usuario_inscrito']
+        }
+    ]
 });
+
+InscripcionesGrupos.associate = (models) => {
+    InscripcionesGrupos.belongsTo(models.PeriodosGrupos, {
+        foreignKey: 'id_periodo_grupo',
+        targetKey: 'id_periodogrupo'
+    });
+    InscripcionesGrupos.belongsTo(models.Usuarios, {
+        foreignKey: 'id_usuario_inscrito',
+        targetKey: 'id_usuario'
+    });
+    InscripcionesGrupos.hasMany(models.Asistencias, {
+        foreignKey: 'id_inscripciongrupo',
+        sourceKey: 'id_inscripciongrupo'
+    });
+};
 
 export default InscripcionesGrupos;
 

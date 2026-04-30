@@ -4,18 +4,27 @@ import { sequelize } from '../../database/mysql.js';  // Importante: importar { 
 const TiposServiciosProveedores = sequelize.define('TiposServiciosProveedores', {
     id_tiposervicioproveedor: {
         type: DataTypes.INTEGER,
-        AUTO_INCREMENT: true,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false
     },
     tipo_servicio_proveedor: {
-        type: DataTypes.STRING,
-        length: 500,
-        allowNull: false
+        type: DataTypes.STRING(500),
+        allowNull: true
     }
 }, {
     timestamps: false,
-    tableName: 'TiposServiciosProveedores'
+    tableName: 'TiposServiciosProveedores',
+    indexes: [
+        { name: 'Idx_TipoServicioProveedor', fields: ['id_tiposervicioproveedor'] }
+    ]
 });
+
+TiposServiciosProveedores.associate = (models) => {
+    TiposServiciosProveedores.hasMany(models.ServiciosProveedores, {
+        foreignKey: 'id_tipo_servicio',
+        sourceKey: 'id_tiposervicioproveedor'
+    });
+};
 
 export default TiposServiciosProveedores;

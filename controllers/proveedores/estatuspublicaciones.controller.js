@@ -7,7 +7,7 @@ const ALLOWED_SORT_FIELDS = ['id_estatuspublicacion', 'estatus_publicacion'];
 const DEFAULT_SORT_FIELD  = 'id_estatuspublicacion';
 
 // ─── Longitudes máximas derivadas del modelo ──────────────────────────────────
-const MAX_ESTATUS_PUBLICACION = 20;
+// const MAX_ESTATUS_PUBLICACION = 20;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /estatuspublicaciones  →  lista paginada con búsqueda y ordenamiento
@@ -57,12 +57,6 @@ export const estatuspublicacionesGet = async (req, res, next) => {
 export const estatuspublicacionGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         // Lectura simple: sin transacción explícita
         const registro = await EstatusPublicaciones.findByPk(id);
@@ -86,22 +80,7 @@ export const estatuspublicacionGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const estatuspublicacionPost = async (req, res, next) => {
     try {
-        const { estatus_publicacion } = req.body;
-
-        // ── Validación ───────────────────────────────────────────────────────
-        if (!estatus_publicacion || typeof estatus_publicacion !== 'string' || estatus_publicacion.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo estatus_publicacion es obligatorio'
-            });
-        }
-        const value = estatus_publicacion.trim();
-        if (value.length > MAX_ESTATUS_PUBLICACION) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estatus_publicacion no puede exceder ${MAX_ESTATUS_PUBLICACION} caracteres`
-            });
-        }
+        const value = String(req.body.estatus_publicacion).trim();
 
         // Verificar duplicado
         const exists = await EstatusPublicaciones.findOne({ where: { estatus_publicacion: value } });
@@ -134,27 +113,7 @@ export const estatuspublicacionPost = async (req, res, next) => {
 export const estatuspublicacionPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
-
-        const { estatus_publicacion } = req.body;
-        if (!estatus_publicacion || typeof estatus_publicacion !== 'string' || estatus_publicacion.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo estatus_publicacion es obligatorio'
-            });
-        }
-        const value = estatus_publicacion.trim();
-        if (value.length > MAX_ESTATUS_PUBLICACION) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estatus_publicacion no puede exceder ${MAX_ESTATUS_PUBLICACION} caracteres`
-            });
-        }
+        const value = String(req.body.estatus_publicacion).trim();
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await EstatusPublicaciones.findByPk(id, { transaction: t });
@@ -205,34 +164,7 @@ export const estatuspublicacionPut = async (req, res, next) => {
 export const estatuspublicacionPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
-
-        const { estatus_publicacion } = req.body;
-        if (typeof estatus_publicacion === 'undefined' || estatus_publicacion === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo estatus_publicacion es requerido'
-            });
-        }
-        if (typeof estatus_publicacion !== 'string' || estatus_publicacion.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo estatus_publicacion no es válido'
-            });
-        }
-
-        const value = estatus_publicacion.trim();
-        if (value.length > MAX_ESTATUS_PUBLICACION) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estatus_publicacion no puede exceder ${MAX_ESTATUS_PUBLICACION} caracteres`
-            });
-        }
+        const value = String(req.body.estatus_publicacion).trim();
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await EstatusPublicaciones.findByPk(id, { transaction: t });
@@ -285,12 +217,6 @@ export const estatuspublicacionPatch = async (req, res, next) => {
 export const estatuspublicacionDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await EstatusPublicaciones.findByPk(id, { transaction: t });

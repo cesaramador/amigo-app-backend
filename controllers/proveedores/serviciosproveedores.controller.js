@@ -11,7 +11,7 @@ const ALLOWED_SORT_FIELDS = [
 const DEFAULT_SORT_FIELD = 'id_servicioproveedor';
 
 // ─── Longitudes máximas derivadas del modelo ──────────────────────────────────
-const MAX_SERVICIO_PROVEEDOR = 500;
+// const MAX_SERVICIO_PROVEEDOR = 500;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /serviciosproveedores  →  lista paginada con búsqueda y ordenamiento
@@ -29,14 +29,7 @@ export const serviciosProveedoresGet = async (req, res, next) => {
 
         // Filtro opcional por id_tipo_servicio
         if (req.query.id_tipo_servicio !== undefined) {
-            const idTipo = parseInt(req.query.id_tipo_servicio, 10);
-            if (!Number.isInteger(idTipo) || idTipo <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El parámetro id_tipo_servicio debe ser un entero positivo'
-                });
-            }
-            where.id_tipo_servicio = idTipo;
+            where.id_tipo_servicio = parseInt(req.query.id_tipo_servicio, 10);
         }
 
         // Ordenamiento seguro
@@ -73,12 +66,6 @@ export const serviciosProveedoresGet = async (req, res, next) => {
 export const serviciosProveedorGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         // Lectura simple: sin transacción explícita
         const registro = await ServiciosProveedores.findByPk(id);
@@ -103,30 +90,8 @@ export const serviciosProveedorGetById = async (req, res, next) => {
 export const serviciosProveedorPost = async (req, res, next) => {
     try {
         const { servicio_proveedor, id_tipo_servicio } = req.body;
-
-        // ── Validación: servicio_proveedor ───────────────────────────────────
-        if (!servicio_proveedor || typeof servicio_proveedor !== 'string' || servicio_proveedor.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo servicio_proveedor es obligatorio'
-            });
-        }
         const servicioVal = servicio_proveedor.trim();
-        if (servicioVal.length > MAX_SERVICIO_PROVEEDOR) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo servicio_proveedor no puede exceder ${MAX_SERVICIO_PROVEEDOR} caracteres`
-            });
-        }
-
-        // ── Validación: id_tipo_servicio ─────────────────────────────────────
         const idTipo = parseInt(id_tipo_servicio, 10);
-        if (!Number.isInteger(idTipo) || idTipo <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_tipo_servicio debe ser un entero positivo'
-            });
-        }
 
         // Verificar duplicado: mismo nombre dentro del mismo tipo de servicio
         const exists = await ServiciosProveedores.findOne({
@@ -167,38 +132,10 @@ export const serviciosProveedorPost = async (req, res, next) => {
 export const serviciosProveedorPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const { servicio_proveedor, id_tipo_servicio } = req.body;
-
-        // ── Validación: servicio_proveedor ───────────────────────────────────
-        if (!servicio_proveedor || typeof servicio_proveedor !== 'string' || servicio_proveedor.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo servicio_proveedor es obligatorio'
-            });
-        }
         const servicioVal = servicio_proveedor.trim();
-        if (servicioVal.length > MAX_SERVICIO_PROVEEDOR) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo servicio_proveedor no puede exceder ${MAX_SERVICIO_PROVEEDOR} caracteres`
-            });
-        }
-
-        // ── Validación: id_tipo_servicio ─────────────────────────────────────
         const idTipo = parseInt(id_tipo_servicio, 10);
-        if (!Number.isInteger(idTipo) || idTipo <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_tipo_servicio debe ser un entero positivo'
-            });
-        }
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await ServiciosProveedores.findByPk(id, { transaction: t });
@@ -253,51 +190,19 @@ export const serviciosProveedorPut = async (req, res, next) => {
 export const serviciosProveedorPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const { servicio_proveedor, id_tipo_servicio } = req.body;
-
-        // Al menos un campo debe venir en el body
-        if (servicio_proveedor === undefined && id_tipo_servicio === undefined) {
-            return res.status(400).json({
-                success: false,
-                message: 'Debe proporcionar al menos un campo para actualizar: servicio_proveedor, id_tipo_servicio'
-            });
-        }
 
         // ── Validaciones de los campos presentes ─────────────────────────────
         const updates = {};
 
         if (servicio_proveedor !== undefined) {
-            if (typeof servicio_proveedor !== 'string' || servicio_proveedor.trim() === '') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo servicio_proveedor no es válido'
-                });
-            }
             const servicioVal = servicio_proveedor.trim();
-            if (servicioVal.length > MAX_SERVICIO_PROVEEDOR) {
-                return res.status(400).json({
-                    success: false,
-                    message: `El campo servicio_proveedor no puede exceder ${MAX_SERVICIO_PROVEEDOR} caracteres`
-                });
-            }
             updates.servicio_proveedor = servicioVal;
         }
 
         if (id_tipo_servicio !== undefined) {
             const idTipo = parseInt(id_tipo_servicio, 10);
-            if (!Number.isInteger(idTipo) || idTipo <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_tipo_servicio debe ser un entero positivo'
-                });
-            }
             updates.id_tipo_servicio = idTipo;
         }
 
@@ -354,12 +259,6 @@ export const serviciosProveedorPatch = async (req, res, next) => {
 export const serviciosProveedorDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await ServiciosProveedores.findByPk(id, { transaction: t });

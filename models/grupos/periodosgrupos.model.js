@@ -4,25 +4,41 @@ import { sequelize } from '../../database/mysql.js';  // Importante: importar { 
 const PeriodosGrupos = sequelize.define('PeriodosGrupos', {
     id_periodogrupo: {
         type: DataTypes.INTEGER,
-        AUTO_INCREMENT: true,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false
     },
     id_grupo: {
         type: DataTypes.INTEGER,
-        allowNull: true
+        allowNull: true,
+        references: {
+            model: 'Grupos',
+            key: 'id_grupo'
+        }
     },
     id_periodo: {
         type: DataTypes.INTEGER,
-        allowNull: true
+        allowNull: true,
+        references: {
+            model: 'Periodos',
+            key: 'id_periodo'
+        }
     },
     id_estatus_grupo: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'EstatusGrupos',
+            key: 'id_estatusgrupo'
+        }
     },
     id_responsable_grupo: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'Usuarios',
+            key: 'id_usuario'
+        }
     },
     hora_inicio: {
         type: DataTypes.TIME,
@@ -34,8 +50,28 @@ const PeriodosGrupos = sequelize.define('PeriodosGrupos', {
     }
 }, {
     timestamps: false,
-    tableName: 'PeriodosGrupos'
+    tableName: 'PeriodosGrupos',
+    indexes: [
+        { name: 'Idx_PeriodoGrupo', fields: ['id_periodogrupo', 'id_grupo', 'id_periodo'] }
+    ]
 });
+
+PeriodosGrupos.associate = (models) => {
+    PeriodosGrupos.belongsTo(models.Grupos, { foreignKey: 'id_grupo', targetKey: 'id_grupo' });
+    PeriodosGrupos.belongsTo(models.Periodos, { foreignKey: 'id_periodo', targetKey: 'id_periodo' });
+    PeriodosGrupos.belongsTo(models.EstatusGrupos, {
+        foreignKey: 'id_estatus_grupo',
+        targetKey: 'id_estatusgrupo'
+    });
+    PeriodosGrupos.belongsTo(models.Usuarios, {
+        foreignKey: 'id_responsable_grupo',
+        targetKey: 'id_usuario'
+    });
+    PeriodosGrupos.hasMany(models.InscripcionesGrupos, {
+        foreignKey: 'id_periodo_grupo',
+        sourceKey: 'id_periodogrupo'
+    });
+};
 
 export default PeriodosGrupos;
 

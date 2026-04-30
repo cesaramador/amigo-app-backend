@@ -6,28 +6,14 @@ import { sequelize } from '../../database/mysql.js';
 const ALLOWED_SORT_FIELDS = ['id_asistencia', 'id_inscripciongrupo', 'fecha', 'asistencia'];
 const DEFAULT_SORT_FIELD  = 'id_asistencia';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Convierte un valor a booleano estricto.
- * Acepta: true/false (bool), "true"/"false"/"1"/"0" (string).
- * Devuelve null si el valor no es reconocible.
- */
-const parseBoolean = (value) => {
-    if (typeof value === 'boolean') return value;
-    if (value === 'true'  || value === '1') return true;
-    if (value === 'false' || value === '0') return false;
-    return null;
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /asistencias  →  lista paginada con filtro y ordenamiento
 // ─────────────────────────────────────────────────────────────────────────────
 export const asistenciasGet = async (req, res, next) => {
     try {
-        // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        // Parametros ya validados/sanitizados por middleware
+        const page   = req.query.page || 1;
+        const limit  = req.query.limit || 10;
         const offset = (page - 1) * limit;
 
         // Filtros opcionales
@@ -35,38 +21,22 @@ export const asistenciasGet = async (req, res, next) => {
 
         // Filtrar por id_inscripciongrupo
         if (req.query.id_inscripciongrupo !== undefined) {
-            const idIg = parseInt(req.query.id_inscripciongrupo, 10);
-            if (!Number.isInteger(idIg) || idIg <= 0) {
-                return res.status(400).json({ success: false, message: 'El parámetro id_inscripciongrupo debe ser un entero positivo' });
-            }
-            where.id_inscripciongrupo = idIg;
+            where.id_inscripciongrupo = req.query.id_inscripciongrupo;
         }
 
         // Filtrar por fecha (rango: fecha_desde / fecha_hasta)
         const rangoFecha = {};
         if (req.query.fecha_desde) {
-            const d = new Date(req.query.fecha_desde);
-            if (isNaN(d.getTime())) {
-                return res.status(400).json({ success: false, message: 'El parámetro fecha_desde no es una fecha válida' });
-            }
-            rangoFecha[Op.gte] = d;
+            rangoFecha[Op.gte] = req.query.fecha_desde;
         }
         if (req.query.fecha_hasta) {
-            const d = new Date(req.query.fecha_hasta);
-            if (isNaN(d.getTime())) {
-                return res.status(400).json({ success: false, message: 'El parámetro fecha_hasta no es una fecha válida' });
-            }
-            rangoFecha[Op.lte] = d;
+            rangoFecha[Op.lte] = req.query.fecha_hasta;
         }
         if (Object.keys(rangoFecha).length) where.fecha = rangoFecha;
 
         // Filtrar por asistencia (true/false)
         if (req.query.asistencia !== undefined) {
-            const boolVal = parseBoolean(req.query.asistencia);
-            if (boolVal === null) {
-                return res.status(400).json({ success: false, message: 'El parámetro asistencia debe ser true o false' });
-            }
-            where.asistencia = boolVal;
+            where.asistencia = req.query.asistencia;
         }
 
         // Ordenamiento seguro
@@ -102,10 +72,7 @@ export const asistenciasGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const asistenciaGetById = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const registro = await Asistencias.findByPk(id);
 
@@ -126,27 +93,9 @@ export const asistenciaGetById = async (req, res, next) => {
 export const asistenciaPost = async (req, res, next) => {
     try {
         const { id_inscripciongrupo, fecha, asistencia } = req.body;
-
-        // Validar id_inscripciongrupo
-        const idIg = parseInt(id_inscripciongrupo, 10);
-        if (!Number.isInteger(idIg) || idIg <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo id_inscripciongrupo es obligatorio y debe ser un entero positivo' });
-        }
-
-        // Validar fecha
-        if (!fecha) {
-            return res.status(400).json({ success: false, message: 'El campo fecha es obligatorio' });
-        }
-        const fechaDate = new Date(fecha);
-        if (isNaN(fechaDate.getTime())) {
-            return res.status(400).json({ success: false, message: 'El campo fecha no es una fecha válida' });
-        }
-
-        // Validar asistencia (booleano)
-        const boolAsistencia = parseBoolean(asistencia);
-        if (boolAsistencia === null) {
-            return res.status(400).json({ success: false, message: 'El campo asistencia es obligatorio y debe ser true o false' });
-        }
+        const idIg = id_inscripciongrupo;
+        const fechaDate = fecha;
+        const boolAsistencia = asistencia;
 
         // Evitar registro duplicado (mismo inscripciongrupo + misma fecha)
         const existente = await Asistencias.findOne({
@@ -180,33 +129,12 @@ export const asistenciaPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const asistenciaPut = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const { id_inscripciongrupo, fecha, asistencia } = req.body;
-
-        // Validar id_inscripciongrupo
-        const idIg = parseInt(id_inscripciongrupo, 10);
-        if (!Number.isInteger(idIg) || idIg <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo id_inscripciongrupo es obligatorio y debe ser un entero positivo' });
-        }
-
-        // Validar fecha
-        if (!fecha) {
-            return res.status(400).json({ success: false, message: 'El campo fecha es obligatorio' });
-        }
-        const fechaDate = new Date(fecha);
-        if (isNaN(fechaDate.getTime())) {
-            return res.status(400).json({ success: false, message: 'El campo fecha no es una fecha válida' });
-        }
-
-        // Validar asistencia
-        const boolAsistencia = parseBoolean(asistencia);
-        if (boolAsistencia === null) {
-            return res.status(400).json({ success: false, message: 'El campo asistencia es obligatorio y debe ser true o false' });
-        }
+        const idIg = id_inscripciongrupo;
+        const fechaDate = fecha;
+        const boolAsistencia = asistencia;
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await Asistencias.findByPk(id, { transaction: t });
@@ -257,46 +185,21 @@ export const asistenciaPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const asistenciaPatch = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
-
-        const camposPermitidos = ['id_inscripciongrupo', 'fecha', 'asistencia'];
-        const camposRecibidos  = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
-
-        if (camposRecibidos.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Se requiere al menos uno de los campos: ${camposPermitidos.join(', ')}`
-            });
-        }
+        const { id } = req.params;
 
         // Construir objeto de cambios validados
         const cambios = {};
 
         if ('id_inscripciongrupo' in req.body) {
-            const idIg = parseInt(req.body.id_inscripciongrupo, 10);
-            if (!Number.isInteger(idIg) || idIg <= 0) {
-                return res.status(400).json({ success: false, message: 'El campo id_inscripciongrupo debe ser un entero positivo' });
-            }
-            cambios.id_inscripciongrupo = idIg;
+            cambios.id_inscripciongrupo = req.body.id_inscripciongrupo;
         }
 
         if ('fecha' in req.body) {
-            const fechaDate = new Date(req.body.fecha);
-            if (isNaN(fechaDate.getTime())) {
-                return res.status(400).json({ success: false, message: 'El campo fecha no es una fecha válida' });
-            }
-            cambios.fecha = fechaDate;
+            cambios.fecha = req.body.fecha;
         }
 
         if ('asistencia' in req.body) {
-            const boolAsistencia = parseBoolean(req.body.asistencia);
-            if (boolAsistencia === null) {
-                return res.status(400).json({ success: false, message: 'El campo asistencia debe ser true o false' });
-            }
-            cambios.asistencia = boolAsistencia;
+            cambios.asistencia = req.body.asistencia;
         }
 
         const actualizado = await sequelize.transaction(async (t) => {
@@ -351,10 +254,7 @@ export const asistenciaPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const asistenciaDelete = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await Asistencias.findByPk(id, { transaction: t });

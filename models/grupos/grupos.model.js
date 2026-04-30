@@ -4,24 +4,35 @@ import { sequelize } from '../../database/mysql.js';  // Importante: importar { 
 const Grupos = sequelize.define('Grupos', {
     id_grupo: {
         type: DataTypes.INTEGER,
-        AUTO_INCREMENT: true,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false
     },
     nombre_grupo: {
-        type: DataTypes.STRING,
-        length: 200,
+        type: DataTypes.STRING(200),
         allowNull: false
     },
     id_tipogrupo: {
         type: DataTypes.INTEGER,
         allowNull: true,
+        references: {
+            model: 'TiposGrupos',
+            key: 'id_tipogrupo'
+        }
     }
 },
 {
     timestamps: false,
-    tableName: 'Grupos'
+    tableName: 'Grupos',
+    indexes: [
+        { name: 'Idx_Grupo', fields: ['id_grupo'] }
+    ]
 });
+
+Grupos.associate = (models) => {
+    Grupos.belongsTo(models.TiposGrupos, { foreignKey: 'id_tipogrupo', targetKey: 'id_tipogrupo' });
+    Grupos.hasMany(models.PeriodosGrupos, { foreignKey: 'id_grupo', sourceKey: 'id_grupo' });
+};
 
 export default Grupos;
 

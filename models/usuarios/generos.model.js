@@ -17,8 +17,15 @@ const Generos = sequelize.define('Generos', {
 },
 {
     timestamps: false,
-    tableName: 'Generos'
+    tableName: 'Generos',
+    indexes: [
+        { name: 'Idx_Genero', fields: ['id_genero'] }
+    ]
 });
+
+Generos.associate = (models) => {
+    Generos.hasMany(models.Usuarios, { foreignKey: 'id_genero', sourceKey: 'id_genero' });
+};
 
 export default Generos;
 

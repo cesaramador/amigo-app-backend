@@ -1,21 +1,30 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';  // Importante: importar { sequelize }
 
-const TipoEncuestas = sequelize.define('TipoEncuestas', {
+const TiposEncuestas = sequelize.define('TiposEncuestas', {
     id_tipoencuesta: {
         type: DataTypes.INTEGER,
-        AUTO_INCREMENT: true,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false
     },
     tipo_encuesta: {
-        type: DataTypes.STRING,
-        length: 50,
+        type: DataTypes.STRING(50),
         allowNull: false
     }
 }, {
     timestamps: false,
-    tableName: 'TipoEncuestas'
+    tableName: 'TiposEncuestas',
+    indexes: [
+        { name: 'Idx_TipoEncuesta', fields: ['id_tipoencuesta'] }
+    ]
 });
 
-export default TipoEncuestas;
+TiposEncuestas.associate = (models) => {
+    TiposEncuestas.hasMany(models.Encuestas, {
+        foreignKey: 'id_tipo_encuesta',
+        sourceKey: 'id_tipoencuesta'
+    });
+};
+
+export default TiposEncuestas;

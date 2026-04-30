@@ -9,15 +9,14 @@ import Generos from "../../models/usuarios/generos.model.js";
 import EstatusUsuarios from "../../models/usuarios/estatususuarios.model.js";
 import EstatusMaritales from "../../models/usuarios/estatusmaritales.model.js";
 import CategoriasViviendas from "../../models/usuarios/categoriasviviendas.model.js";
+import { sequelize } from '../../database/mysql.js';
 import { JWT_EXPIRES_IN, JWT_SECRET, NODE_ENV } from '../../config/env.js';
-import { generarCodigoAccesoPlain, sendRecoveryCodeEmailAsync } from '../../helpers/codigo-acceso-email.js';
+import { generarCodigoAccesoPlain, sendRecoveryCodeEmailAsync, sendVerificationEmail } from '../../helpers/codigo-acceso-email.js';
 import {
     ALLOWED_WRITE_FIELDS,
     buildPayload,
-    getModelMaxLengths,
-    validateFormats
+    // getModelMaxLengths
 } from '../../helpers/usuario-registro-payload.js';
-import { persistirNuevoUsuarioConCodigo } from '../../services/usuario-alta.service.js';
 
 /**
  * Si el navegador llama al API desde otro origen (p. ej. localhost:8081 → amigo.dextrati.cloud),
@@ -43,7 +42,6 @@ function isSameSiteAsApi(req) {
 // ─────────────────────────────────────────────────────────────────────────────
 export const registrar = async (req, res) => {
     try {
-        const maxLengths = getModelMaxLengths();
         let payload;
         try {
             payload = buildPayload(req.body, ALLOWED_WRITE_FIELDS);
@@ -56,25 +54,47 @@ export const registrar = async (req, res) => {
             payload.email = String(payload.email).trim().toLowerCase();
         }
 
-        const attrs = Usuario.rawAttributes || {};
-        const requiredFields = Object.keys(attrs).filter(name => {
-            const m = attrs[name];
-            return m.allowNull === false && !m.primaryKey && m.defaultValue === undefined && name !== 'codigo' && name !== 'fecha_registro';
-        });
-        const missing = requiredFields.filter(f => {
-            const v = payload[f];
-            return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
-        });
-        if (missing.length) {
-            return res.status(400).json({ success: false, message: 'Faltan campos obligatorios.', fields: missing });
-        }
+        const codigoPlain = generarCodigoAccesoPlain();
+        const codigoHash = await bcrypt.hash(codigoPlain, 10);
 
-        const formatErrors = validateFormats(payload, maxLengths);
-        if (formatErrors.length) {
-            return res.status(400).json({ success: false, message: 'Errores de formato en los datos.', fields: formatErrors });
-        }
+        const data = {
+            ...payload,
+            codigo: codigoHash,
+            fecha_registro: new Date()
+        };
 
-        const { userSafe } = await persistirNuevoUsuarioConCodigo(payload);
+        const nuevoUsuario = await sequelize.transaction(async (t) => {
+            if (data.email) {
+                const existsEmail = await Usuario.findOne({
+                    where: { email: data.email },
+                    transaction: t
+                });
+                if (existsEmail) {
+                    const err = new Error('El email ya está registrado.');
+                    err.statusCode = 409;
+                    err.field = 'email';
+                    throw err;
+                }
+            }
+            if (data.telefono_personal) {
+                const existsTel = await Usuario.findOne({
+                    where: { telefono_personal: data.telefono_personal },
+                    transaction: t
+                });
+                if (existsTel) {
+                    const err = new Error('El teléfono personal ya está registrado.');
+                    err.statusCode = 409;
+                    err.field = 'telefono_personal';
+                    throw err;
+                }
+            }
+            return await Usuario.create(data, { transaction: t });
+        });
+
+        sendVerificationEmail(data.email, data.nombre, codigoPlain);
+
+        const userSafe = nuevoUsuario.get({ plain: true });
+        delete userSafe.codigo;
 
         return res.status(201).json({
             success: true,
@@ -98,10 +118,6 @@ export const registrar = async (req, res) => {
 export const iniciar = async (req, res) => {
     try {
         const { telefono_personal, codigo } = req.body;
-
-        if (!telefono_personal || !codigo) {
-            return res.status(400).json({ success: false, message: "El teléfono y el código son obligatorios." });
-        }
 
         const user = await Usuario.findOne({ where: { telefono_personal } });
         if (!user) {
@@ -329,10 +345,6 @@ export const abandonar = async (req, res) => {
 export const obtenerMunicipiosPorEstado = async (req, res) => {
     try {
         const id_estado = Number(req.params.id_estado);
-
-        if (!Number.isInteger(id_estado) || id_estado <= 0) {
-            return res.status(400).json({ success: false, message: "Debe proporcionar un id_estado válido." });
-        }
 
         // Operación de lectura simple, sin necesidad de transacción.
         const municipios = await Municipios.findAll({

@@ -18,8 +18,15 @@ const TiposUsuarios = sequelize.define('TiposUsuarios', {
 },
 {
     timestamps: false,
-    tableName: 'TiposUsuarios'
+    tableName: 'TiposUsuarios',
+    indexes: [
+        { name: 'Idx_TipoUsuario', fields: ['id_tipousuario'] }
+    ]
 });
+
+TiposUsuarios.associate = (models) => {
+    TiposUsuarios.hasMany(models.Usuarios, { foreignKey: 'id_tipousuario', sourceKey: 'id_tipousuario' });
+};
 
 export default TiposUsuarios;
 

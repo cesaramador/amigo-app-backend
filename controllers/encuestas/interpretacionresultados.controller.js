@@ -13,17 +13,17 @@ const ALLOWED_SORT_FIELDS = [
 const DEFAULT_SORT_FIELD = 'id_interpreta_resultado';
 
 // ─── Longitudes máximas derivadas del modelo ──────────────────────────────────
-const MAX_GRAVEDAD           = 100;
-const MAX_ACCIONES_PROPUESTAS = 500;
+// const MAX_GRAVEDAD           = 100;
+// const MAX_ACCIONES_PROPUESTAS = 500;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /interpretacionresultados  →  lista paginada con búsqueda y ordenamiento
 // ─────────────────────────────────────────────────────────────────────────────
 export const interpretacionresultadosGet = async (req, res, next) => {
     try {
-        // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page,  10) || 1);
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        // Parametros ya validados/sanitizados por middleware
+        const page   = req.query.page || 1;
+        const limit  = req.query.limit || 10;
         const offset = (page - 1) * limit;
 
         // Búsqueda por texto sobre el campo gravedad o acciones_propuestas
@@ -39,14 +39,7 @@ export const interpretacionresultadosGet = async (req, res, next) => {
 
         // Filtro opcional por id_encuesta
         if (req.query.id_encuesta) {
-            const idEnc = parseInt(req.query.id_encuesta, 10);
-            if (!Number.isInteger(idEnc) || idEnc <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El parámetro id_encuesta debe ser un entero positivo'
-                });
-            }
-            where.id_encuesta = idEnc;
+            where.id_encuesta = req.query.id_encuesta;
         }
 
         // Ordenamiento seguro
@@ -81,13 +74,7 @@ export const interpretacionresultadosGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const interpretacionresultadoGetById = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const registro = await InterpretacionResultados.findByPk(id);
 
@@ -111,56 +98,10 @@ export const interpretacionresultadoGetById = async (req, res, next) => {
 export const interpretacionresultadoPost = async (req, res, next) => {
     try {
         const { id_encuesta, puntuacion, gravedad, acciones_propuestas } = req.body;
-
-        // ── Validaciones de campos obligatorios ──────────────────────────────
-
-        // id_encuesta
-        const idEnc = parseInt(id_encuesta, 10);
-        if (!Number.isInteger(idEnc) || idEnc <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_encuesta debe ser un entero positivo'
-            });
-        }
-
-        // puntuacion
-        const punt = parseInt(puntuacion, 10);
-        if (!Number.isInteger(punt)) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo puntuacion debe ser un número entero'
-            });
-        }
-
-        // gravedad
-        if (!gravedad || typeof gravedad !== 'string' || gravedad.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo gravedad es obligatorio'
-            });
-        }
+        const idEnc = id_encuesta;
+        const punt = puntuacion;
         const gravedadVal = gravedad.trim();
-        if (gravedadVal.length > MAX_GRAVEDAD) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo gravedad no puede exceder ${MAX_GRAVEDAD} caracteres`
-            });
-        }
-
-        // acciones_propuestas
-        if (!acciones_propuestas || typeof acciones_propuestas !== 'string' || acciones_propuestas.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo acciones_propuestas es obligatorio'
-            });
-        }
         const accionesVal = acciones_propuestas.trim();
-        if (accionesVal.length > MAX_ACCIONES_PROPUESTAS) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo acciones_propuestas no puede exceder ${MAX_ACCIONES_PROPUESTAS} caracteres`
-            });
-        }
 
         // Verificar duplicado: misma encuesta + misma puntuacion
         const exists = await InterpretacionResultados.findOne({
@@ -202,61 +143,13 @@ export const interpretacionresultadoPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const interpretacionresultadoPut = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const { id_encuesta, puntuacion, gravedad, acciones_propuestas } = req.body;
-
-        // ── Validaciones ─────────────────────────────────────────────────────
-
-        const idEnc = parseInt(id_encuesta, 10);
-        if (!Number.isInteger(idEnc) || idEnc <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_encuesta debe ser un entero positivo'
-            });
-        }
-
-        const punt = parseInt(puntuacion, 10);
-        if (!Number.isInteger(punt)) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo puntuacion debe ser un número entero'
-            });
-        }
-
-        if (!gravedad || typeof gravedad !== 'string' || gravedad.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo gravedad es obligatorio'
-            });
-        }
+        const idEnc = id_encuesta;
+        const punt = puntuacion;
         const gravedadVal = gravedad.trim();
-        if (gravedadVal.length > MAX_GRAVEDAD) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo gravedad no puede exceder ${MAX_GRAVEDAD} caracteres`
-            });
-        }
-
-        if (!acciones_propuestas || typeof acciones_propuestas !== 'string' || acciones_propuestas.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo acciones_propuestas es obligatorio'
-            });
-        }
         const accionesVal = acciones_propuestas.trim();
-        if (accionesVal.length > MAX_ACCIONES_PROPUESTAS) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo acciones_propuestas no puede exceder ${MAX_ACCIONES_PROPUESTAS} caracteres`
-            });
-        }
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await InterpretacionResultados.findByPk(id, { transaction: t });
@@ -315,85 +208,28 @@ export const interpretacionresultadoPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const interpretacionresultadoPatch = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const { id_encuesta, puntuacion, gravedad, acciones_propuestas } = req.body;
-
-        // Al menos un campo debe venir en el body
-        if (
-            id_encuesta        === undefined &&
-            puntuacion         === undefined &&
-            gravedad           === undefined &&
-            acciones_propuestas === undefined
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: 'Debe proporcionar al menos un campo para actualizar: id_encuesta, puntuacion, gravedad, acciones_propuestas'
-            });
-        }
 
         // ── Validaciones de los campos presentes ─────────────────────────────
         const updates = {};
 
         if (id_encuesta !== undefined) {
-            const idEnc = parseInt(id_encuesta, 10);
-            if (!Number.isInteger(idEnc) || idEnc <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_encuesta debe ser un entero positivo'
-                });
-            }
-            updates.id_encuesta = idEnc;
+            updates.id_encuesta = id_encuesta;
         }
 
         if (puntuacion !== undefined) {
-            const punt = parseInt(puntuacion, 10);
-            if (!Number.isInteger(punt)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo puntuacion debe ser un número entero'
-                });
-            }
-            updates.puntuacion = punt;
+            updates.puntuacion = puntuacion;
         }
 
         if (gravedad !== undefined) {
-            if (typeof gravedad !== 'string' || gravedad.trim() === '') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo gravedad no es válido'
-                });
-            }
             const gravedadVal = gravedad.trim();
-            if (gravedadVal.length > MAX_GRAVEDAD) {
-                return res.status(400).json({
-                    success: false,
-                    message: `El campo gravedad no puede exceder ${MAX_GRAVEDAD} caracteres`
-                });
-            }
             updates.gravedad = gravedadVal;
         }
 
         if (acciones_propuestas !== undefined) {
-            if (typeof acciones_propuestas !== 'string' || acciones_propuestas.trim() === '') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo acciones_propuestas no es válido'
-                });
-            }
             const accionesVal = acciones_propuestas.trim();
-            if (accionesVal.length > MAX_ACCIONES_PROPUESTAS) {
-                return res.status(400).json({
-                    success: false,
-                    message: `El campo acciones_propuestas no puede exceder ${MAX_ACCIONES_PROPUESTAS} caracteres`
-                });
-            }
             updates.acciones_propuestas = accionesVal;
         }
 
@@ -451,13 +287,7 @@ export const interpretacionresultadoPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const interpretacionresultadoDelete = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await InterpretacionResultados.findByPk(id, { transaction: t });

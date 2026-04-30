@@ -14,14 +14,14 @@ const ALLOWED_SORT_FIELDS = [
 const DEFAULT_SORT_FIELD = 'id_publicacion';
 
 // ─── Longitudes máximas derivadas del modelo ──────────────────────────────────
-const MAX_IMAGEN = 800;
+// const MAX_IMAGEN = 800;
 
 // ─── Utilidad: valida que un valor sea una fecha parseable ────────────────────
-const isValidDate = (value) => {
-    if (!value) return false;
-    const d = new Date(value);
-    return !isNaN(d.getTime());
-};
+// const isValidDate = (value) => {
+//    if (!value) return false;
+//    const d = new Date(value);
+//    return !isNaN(d.getTime());
+//};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /publicaciones  →  lista paginada con filtros y ordenamiento
@@ -37,47 +37,21 @@ export const publicacionesGet = async (req, res, next) => {
 
         // Filtro opcional por id_proveedorconservicio
         if (req.query.id_proveedorconservicio !== undefined) {
-            const idPCS = parseInt(req.query.id_proveedorconservicio, 10);
-            if (!Number.isInteger(idPCS) || idPCS <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El parámetro id_proveedorconservicio debe ser un entero positivo'
-                });
-            }
-            where.id_proveedorconservicio = idPCS;
+            where.id_proveedorconservicio = parseInt(req.query.id_proveedorconservicio, 10);
         }
 
         // Filtro opcional por id_estatus_publicacion
         if (req.query.id_estatus_publicacion !== undefined) {
-            const idEst = parseInt(req.query.id_estatus_publicacion, 10);
-            if (!Number.isInteger(idEst) || idEst <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El parámetro id_estatus_publicacion debe ser un entero positivo'
-                });
-            }
-            where.id_estatus_publicacion = idEst;
+            where.id_estatus_publicacion = parseInt(req.query.id_estatus_publicacion, 10);
         }
 
         // Filtro opcional por rango de fecha de inicio de publicación
         if (req.query.fecha_desde || req.query.fecha_hasta) {
             const rangoFecha = {};
             if (req.query.fecha_desde) {
-                if (!isValidDate(req.query.fecha_desde)) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'El parámetro fecha_desde no es una fecha válida'
-                    });
-                }
                 rangoFecha[Op.gte] = new Date(req.query.fecha_desde);
             }
             if (req.query.fecha_hasta) {
-                if (!isValidDate(req.query.fecha_hasta)) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'El parámetro fecha_hasta no es una fecha válida'
-                    });
-                }
                 rangoFecha[Op.lte] = new Date(req.query.fecha_hasta);
             }
             where.fecha_inicio_publicacion = rangoFecha;
@@ -117,12 +91,6 @@ export const publicacionesGet = async (req, res, next) => {
 export const publicacionGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         // Lectura simple: sin transacción explícita
         const registro = await Publicaciones.findByPk(id);
@@ -155,71 +123,12 @@ export const publicacionPost = async (req, res, next) => {
             id_estatus_publicacion
         } = req.body;
 
-        // ── Validación: id_proveedorconservicio ──────────────────────────────
-        const idPCS = parseInt(id_proveedorconservicio, 10);
-        if (!Number.isInteger(idPCS) || idPCS <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_proveedorconservicio debe ser un entero positivo'
-            });
-        }
-
-        // ── Validación: imagen ───────────────────────────────────────────────
-        if (!imagen || typeof imagen !== 'string' || imagen.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo imagen es obligatorio'
-            });
-        }
+        // const idPCS = parseInt(id_proveedorconservicio, 10);
         const imagenVal = imagen.trim();
-        if (imagenVal.length > MAX_IMAGEN) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo imagen no puede exceder ${MAX_IMAGEN} caracteres`
-            });
-        }
-
-        // ── Validación: fecha_registro_publicacion ───────────────────────────
-        if (!isValidDate(fecha_registro_publicacion)) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo fecha_registro_publicacion es obligatorio y debe ser una fecha válida (ISO 8601)'
-            });
-        }
-
-        // ── Validación: fecha_inicio_publicacion ─────────────────────────────
-        if (!isValidDate(fecha_inicio_publicacion)) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo fecha_inicio_publicacion es obligatorio y debe ser una fecha válida (ISO 8601)'
-            });
-        }
-
-        // ── Validación: fecha_fin_publicacion ────────────────────────────────
-        if (!isValidDate(fecha_fin_publicacion)) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo fecha_fin_publicacion es obligatorio y debe ser una fecha válida (ISO 8601)'
-            });
-        }
 
         const fechaInicio = new Date(fecha_inicio_publicacion);
         const fechaFin    = new Date(fecha_fin_publicacion);
-        if (fechaFin <= fechaInicio) {
-            return res.status(400).json({
-                success: false,
-                message: 'La fecha_fin_publicacion debe ser posterior a la fecha_inicio_publicacion'
-            });
-        }
-
-        // ── Validación: id_estatus_publicacion ───────────────────────────────
         const idEst = parseInt(id_estatus_publicacion, 10);
-        if (!Number.isInteger(idEst) || idEst <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_estatus_publicacion debe ser un entero positivo'
-            });
-        }
 
         // Crear dentro de transacción
         const nueva = await sequelize.transaction(async (t) => {
@@ -253,12 +162,6 @@ export const publicacionPost = async (req, res, next) => {
 export const publicacionPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const {
             id_proveedorconservicio,
@@ -269,66 +172,13 @@ export const publicacionPut = async (req, res, next) => {
             id_estatus_publicacion
         } = req.body;
 
-        // ── Validaciones ─────────────────────────────────────────────────────
-        const idPCS = parseInt(id_proveedorconservicio, 10);
-        if (!Number.isInteger(idPCS) || idPCS <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_proveedorconservicio debe ser un entero positivo'
-            });
-        }
-
-        if (!imagen || typeof imagen !== 'string' || imagen.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo imagen es obligatorio'
-            });
-        }
+        // const idPCS = parseInt(id_proveedorconservicio, 10);
         const imagenVal = imagen.trim();
-        if (imagenVal.length > MAX_IMAGEN) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo imagen no puede exceder ${MAX_IMAGEN} caracteres`
-            });
-        }
-
-        if (!isValidDate(fecha_registro_publicacion)) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo fecha_registro_publicacion es obligatorio y debe ser una fecha válida (ISO 8601)'
-            });
-        }
-
-        if (!isValidDate(fecha_inicio_publicacion)) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo fecha_inicio_publicacion es obligatorio y debe ser una fecha válida (ISO 8601)'
-            });
-        }
-
-        if (!isValidDate(fecha_fin_publicacion)) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo fecha_fin_publicacion es obligatorio y debe ser una fecha válida (ISO 8601)'
-            });
-        }
 
         const fechaInicio = new Date(fecha_inicio_publicacion);
         const fechaFin    = new Date(fecha_fin_publicacion);
-        if (fechaFin <= fechaInicio) {
-            return res.status(400).json({
-                success: false,
-                message: 'La fecha_fin_publicacion debe ser posterior a la fecha_inicio_publicacion'
-            });
-        }
 
         const idEst = parseInt(id_estatus_publicacion, 10);
-        if (!Number.isInteger(idEst) || idEst <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_estatus_publicacion debe ser un entero positivo'
-            });
-        }
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await Publicaciones.findByPk(id, { transaction: t });
@@ -372,12 +222,6 @@ export const publicacionPut = async (req, res, next) => {
 export const publicacionPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const {
             id_proveedorconservicio,
@@ -388,90 +232,32 @@ export const publicacionPatch = async (req, res, next) => {
             id_estatus_publicacion
         } = req.body;
 
-        // Al menos un campo debe venir en el body
-        if (
-            id_proveedorconservicio    === undefined &&
-            imagen                     === undefined &&
-            fecha_registro_publicacion === undefined &&
-            fecha_inicio_publicacion   === undefined &&
-            fecha_fin_publicacion      === undefined &&
-            id_estatus_publicacion     === undefined
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: 'Debe proporcionar al menos un campo para actualizar'
-            });
-        }
-
-        // ── Validaciones de los campos presentes ─────────────────────────────
         const updates = {};
 
         if (id_proveedorconservicio !== undefined) {
             const idPCS = parseInt(id_proveedorconservicio, 10);
-            if (!Number.isInteger(idPCS) || idPCS <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_proveedorconservicio debe ser un entero positivo'
-                });
-            }
             updates.id_proveedorconservicio = idPCS;
         }
 
         if (imagen !== undefined) {
-            if (typeof imagen !== 'string' || imagen.trim() === '') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo imagen no es válido'
-                });
-            }
             const imagenVal = imagen.trim();
-            if (imagenVal.length > MAX_IMAGEN) {
-                return res.status(400).json({
-                    success: false,
-                    message: `El campo imagen no puede exceder ${MAX_IMAGEN} caracteres`
-                });
-            }
             updates.imagen = imagenVal;
         }
 
         if (fecha_registro_publicacion !== undefined) {
-            if (!isValidDate(fecha_registro_publicacion)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo fecha_registro_publicacion debe ser una fecha válida (ISO 8601)'
-                });
-            }
             updates.fecha_registro_publicacion = new Date(fecha_registro_publicacion);
         }
 
         if (fecha_inicio_publicacion !== undefined) {
-            if (!isValidDate(fecha_inicio_publicacion)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo fecha_inicio_publicacion debe ser una fecha válida (ISO 8601)'
-                });
-            }
             updates.fecha_inicio_publicacion = new Date(fecha_inicio_publicacion);
         }
 
         if (fecha_fin_publicacion !== undefined) {
-            if (!isValidDate(fecha_fin_publicacion)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo fecha_fin_publicacion debe ser una fecha válida (ISO 8601)'
-                });
-            }
             updates.fecha_fin_publicacion = new Date(fecha_fin_publicacion);
         }
 
         if (id_estatus_publicacion !== undefined) {
             const idEst = parseInt(id_estatus_publicacion, 10);
-            if (!Number.isInteger(idEst) || idEst <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_estatus_publicacion debe ser un entero positivo'
-                });
-            }
             updates.id_estatus_publicacion = idEst;
         }
 
@@ -521,12 +307,6 @@ export const publicacionPatch = async (req, res, next) => {
 export const publicacionDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await Publicaciones.findByPk(id, { transaction: t });

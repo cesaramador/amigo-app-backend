@@ -4,28 +4,34 @@ import { sequelize } from '../../database/mysql.js';  // Importante: importar { 
 const Periodos = sequelize.define('Periodos', {
     id_periodo: {
         type: DataTypes.INTEGER,
-        AUTO_INCREMENT: true,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false
     },
     periodo: {
-        type: DataTypes.STRING,
-        length: 100,
+        type: DataTypes.STRING(100),
         allowNull: false
     },
     fecha_inicio: {
-        type: DataTypes.DATE,
+        type: DataTypes.DATEONLY,
         allowNull: true
     },
     fecha_fin: {
-        type: DataTypes.DATE,
+        type: DataTypes.DATEONLY,
         allowNull: true
     }
 },
 {
     timestamps: false,
-    tableName: 'Periodos'
+    tableName: 'Periodos',
+    indexes: [
+        { name: 'Idx_Periodo', fields: ['id_periodo'] }
+    ]
 });
+
+Periodos.associate = (models) => {
+    Periodos.hasMany(models.PeriodosGrupos, { foreignKey: 'id_periodo', sourceKey: 'id_periodo' });
+};
 
 export default Periodos;
 

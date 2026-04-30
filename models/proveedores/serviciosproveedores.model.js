@@ -4,22 +4,39 @@ import { sequelize } from '../../database/mysql.js';  // Importante: importar { 
 const ServiciosProveedores = sequelize.define('ServiciosProveedores', {
     id_servicioproveedor: {
         type: DataTypes.INTEGER,
-        AUTO_INCREMENT: true,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false
     },
     servicio_proveedor: {
-        type: DataTypes.STRING,
-        length: 500,
-        allowNull: false
+        type: DataTypes.STRING(500),
+        allowNull: true
     },
     id_tipo_servicio: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'TiposServiciosProveedores',
+            key: 'id_tiposervicioproveedor'
+        }
     }
 }, {
     timestamps: false,
-    tableName: 'ServiciosProveedores'
+    tableName: 'ServiciosProveedores',
+    indexes: [
+        { name: 'Idx_ServicioProveedor', fields: ['id_servicioproveedor'] }
+    ]
 });
+
+ServiciosProveedores.associate = (models) => {
+    ServiciosProveedores.belongsTo(models.TiposServiciosProveedores, {
+        foreignKey: 'id_tipo_servicio',
+        targetKey: 'id_tiposervicioproveedor'
+    });
+    ServiciosProveedores.hasMany(models.ProveedoresConServicios, {
+        foreignKey: 'id_servicio_proveedor',
+        sourceKey: 'id_servicioproveedor'
+    });
+};
 
 export default ServiciosProveedores;

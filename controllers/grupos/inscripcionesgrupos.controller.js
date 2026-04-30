@@ -6,39 +6,25 @@ import { sequelize } from '../../database/mysql.js';
 const ALLOWED_SORT_FIELDS = ['id_inscripciongrupo', 'id_periodo_grupo', 'id_usuario_inscrito'];
 const DEFAULT_SORT_FIELD  = 'id_inscripciongrupo';
 
-// ─── Helper: validar entero positivo ─────────────────────────────────────────
-const parsePositiveInt = (value) => {
-    const n = parseInt(value, 10);
-    return Number.isInteger(n) && n > 0 ? n : null;
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /inscripcionesgrupos  →  lista paginada con filtros y ordenamiento
 // ─────────────────────────────────────────────────────────────────────────────
 export const inscripcionesgruposGet = async (req, res, next) => {
     try {
-        // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        // Parametros ya validados/sanitizados por middleware
+        const page   = req.query.page || 1;
+        const limit  = req.query.limit || 10;
         const offset = (page - 1) * limit;
 
         // Filtros opcionales
         const where = {};
 
         if (req.query.id_periodo_grupo !== undefined) {
-            const val = parsePositiveInt(req.query.id_periodo_grupo);
-            if (val === null) {
-                return res.status(400).json({ success: false, message: 'El parámetro id_periodo_grupo debe ser un entero positivo' });
-            }
-            where.id_periodo_grupo = val;
+            where.id_periodo_grupo = req.query.id_periodo_grupo;
         }
 
         if (req.query.id_usuario_inscrito !== undefined) {
-            const val = parsePositiveInt(req.query.id_usuario_inscrito);
-            if (val === null) {
-                return res.status(400).json({ success: false, message: 'El parámetro id_usuario_inscrito debe ser un entero positivo' });
-            }
-            where.id_usuario_inscrito = val;
+            where.id_usuario_inscrito = req.query.id_usuario_inscrito;
         }
 
         // Ordenamiento seguro
@@ -74,10 +60,7 @@ export const inscripcionesgruposGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const inscripcionesgrupoGetById = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         // Lectura simple: sin transacción explícita
         const registro = await InscripcionesGrupos.findByPk(id);
@@ -99,17 +82,8 @@ export const inscripcionesgrupoGetById = async (req, res, next) => {
 export const inscripcionesgrupoPost = async (req, res, next) => {
     try {
         const { id_periodo_grupo, id_usuario_inscrito } = req.body;
-
-        // Validar que ambos campos sean enteros positivos
-        const idPeriodo  = parsePositiveInt(id_periodo_grupo);
-        const idUsuario  = parsePositiveInt(id_usuario_inscrito);
-
-        if (idPeriodo === null) {
-            return res.status(400).json({ success: false, message: 'El campo id_periodo_grupo es obligatorio y debe ser un entero positivo' });
-        }
-        if (idUsuario === null) {
-            return res.status(400).json({ success: false, message: 'El campo id_usuario_inscrito es obligatorio y debe ser un entero positivo' });
-        }
+        const idPeriodo = id_periodo_grupo;
+        const idUsuario = id_usuario_inscrito;
 
         // Verificar duplicado: la combinación (id_periodo_grupo + id_usuario_inscrito) debe ser única
         const existe = await InscripcionesGrupos.findOne({
@@ -143,23 +117,10 @@ export const inscripcionesgrupoPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const inscripcionesgrupoPut = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
-
+        const { id } = req.params;
         const { id_periodo_grupo, id_usuario_inscrito } = req.body;
-
-        // Validar campos obligatorios
-        const idPeriodo = parsePositiveInt(id_periodo_grupo);
-        const idUsuario = parsePositiveInt(id_usuario_inscrito);
-
-        if (idPeriodo === null) {
-            return res.status(400).json({ success: false, message: 'El campo id_periodo_grupo es obligatorio y debe ser un entero positivo' });
-        }
-        if (idUsuario === null) {
-            return res.status(400).json({ success: false, message: 'El campo id_usuario_inscrito es obligatorio y debe ser un entero positivo' });
-        }
+        const idPeriodo = id_periodo_grupo;
+        const idUsuario = id_usuario_inscrito;
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await InscripcionesGrupos.findByPk(id, { transaction: t });
@@ -207,36 +168,11 @@ export const inscripcionesgrupoPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const inscripcionesgrupoPatch = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const { id_periodo_grupo, id_usuario_inscrito } = req.body;
-
-        if (id_periodo_grupo === undefined && id_usuario_inscrito === undefined) {
-            return res.status(400).json({
-                success: false,
-                message: 'Se requiere al menos uno de los campos: id_periodo_grupo, id_usuario_inscrito'
-            });
-        }
-
-        // Validar cada campo si fue enviado
-        let idPeriodo, idUsuario;
-
-        if (id_periodo_grupo !== undefined) {
-            idPeriodo = parsePositiveInt(id_periodo_grupo);
-            if (idPeriodo === null) {
-                return res.status(400).json({ success: false, message: 'El campo id_periodo_grupo debe ser un entero positivo' });
-            }
-        }
-
-        if (id_usuario_inscrito !== undefined) {
-            idUsuario = parsePositiveInt(id_usuario_inscrito);
-            if (idUsuario === null) {
-                return res.status(400).json({ success: false, message: 'El campo id_usuario_inscrito debe ser un entero positivo' });
-            }
-        }
+        const idPeriodo = id_periodo_grupo;
+        const idUsuario = id_usuario_inscrito;
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await InscripcionesGrupos.findByPk(id, { transaction: t });
@@ -299,10 +235,7 @@ export const inscripcionesgrupoPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const inscripcionesgrupoDelete = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await InscripcionesGrupos.findByPk(id, { transaction: t });

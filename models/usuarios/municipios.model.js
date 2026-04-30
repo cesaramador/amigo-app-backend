@@ -27,9 +27,16 @@ const Municipios = sequelize.define('Municipios', {
     timestamps: false,
     tableName: 'Municipios',
     indexes: [
+        { name: 'Idx_Municipio', fields: ['id_municipio'] },
         { unique: true, fields: ['id_estado', 'num_municipio'] }
     ]
 });
+
+Municipios.associate = (models) => {
+    Municipios.belongsTo(models.Estados, { foreignKey: 'id_estado', targetKey: 'id_estado' });
+    // En SQL la FK Usuarios.id_municipio esta comentada; se mantiene relacion logica.
+    Municipios.hasMany(models.Usuarios, { foreignKey: 'id_municipio', sourceKey: 'id_municipio', constraints: false });
+};
 
 export default Municipios;
 

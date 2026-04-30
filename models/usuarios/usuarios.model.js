@@ -1,6 +1,13 @@
 // para generar los modelos se usa: npx sequelize-cli model:generate --name User --attributes firstName:string,lastName:string,email:string,password:string
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';  // Importante: importar { sequelize }
+import TiposUsuarios from './tiposusuarios.model.js';
+import Estados from './estados.model.js';
+import Municipios from './municipios.model.js';
+import Generos from './generos.model.js';
+import EstatusUsuarios from './estatususuarios.model.js';
+import EstatusMaritales from './estatusmaritales.model.js';
+import CategoriasViviendas from './categoriasviviendas.model.js';
 
 const Usuarios = sequelize.define('Usuarios', {
     id_usuario: {
@@ -12,7 +19,11 @@ const Usuarios = sequelize.define('Usuarios', {
     id_tipousuario: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        defaultValue: 3 // valor por defecto para usuario normal
+        defaultValue: 3, // valor por defecto para usuario normal
+        references: {
+            model: 'TiposUsuarios',
+            key: 'id_tipousuario'
+        }
     },
     nombre: {
         type: DataTypes.STRING(50),
@@ -27,7 +38,7 @@ const Usuarios = sequelize.define('Usuarios', {
         allowNull: true
     },
     fecha_nacimiento: {
-        type: DataTypes.DATE,
+        type: DataTypes.DATEONLY,
         allowNull: true
     },
     telefono_personal: {
@@ -51,7 +62,11 @@ const Usuarios = sequelize.define('Usuarios', {
     },
     id_estado: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'Estados',
+            key: 'id_estado'
+        }
     },
     id_municipio: {
         type: DataTypes.INTEGER,
@@ -86,29 +101,66 @@ const Usuarios = sequelize.define('Usuarios', {
         allowNull: true
     },
     fecha_registro: {
-        type: DataTypes.DATE,
+        type: DataTypes.DATEONLY,
         allowNull: false
     },
     id_genero: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'Generos',
+            key: 'id_genero'
+        }
     },
     id_estatus_usuario: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        defaultValue: 3 // valor por defecto para estatus pendiente
+        defaultValue: 3, // valor por defecto para estatus pendiente
+        references: {
+            model: 'EstatusUsuarios',
+            key: 'id_estatususuario'
+        }
     },
     id_estatus_marital: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'EstatusMaritales',
+            key: 'id_estatusmarital'
+        }
     },
     id_categoria_vivienda: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'CategoriasViviendas',
+            key: 'id_categoriavivienda'
+        }
     }
 }, {
     timestamps: false,
-    tableName: 'Usuarios'
+    tableName: 'Usuarios',
+    indexes: [
+        {
+            name: 'Idx_Usuario',
+            fields: ['id_usuario', 'id_tipousuario', 'nombre', 'ap_paterno', 'ap_materno', 'telefono_personal']
+        }
+    ]
 });
+
+Usuarios.belongsTo(TiposUsuarios, { foreignKey: 'id_tipousuario', targetKey: 'id_tipousuario' });
+
+Usuarios.belongsTo(Estados, { foreignKey: 'id_estado', targetKey: 'id_estado' });
+
+// En el SQL base la FK de id_municipio está comentada; se deja relación lógica sin constraint.
+Usuarios.belongsTo(Municipios, { foreignKey: 'id_municipio', targetKey: 'id_municipio', constraints: false });
+
+Usuarios.belongsTo(Generos, { foreignKey: 'id_genero', targetKey: 'id_genero' });
+
+Usuarios.belongsTo(EstatusUsuarios, { foreignKey: 'id_estatus_usuario', targetKey: 'id_estatususuario' });
+
+Usuarios.belongsTo(EstatusMaritales, { foreignKey: 'id_estatus_marital', targetKey: 'id_estatusmarital' });
+
+Usuarios.belongsTo(CategoriasViviendas, { foreignKey: 'id_categoria_vivienda', targetKey: 'id_categoriavivienda' });
 
 export default Usuarios;

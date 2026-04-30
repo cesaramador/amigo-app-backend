@@ -59,28 +59,7 @@ export const vistaPost = async (req, res, next) => {
     let transaction;
     
     try {
-        // Validar que existan datos en el body
-        if (!req.body || Object.keys(req.body).length === 0) {
-            const error = new Error('Datos de la vista requeridos');
-            error.statusCode = 400;
-            return next(error);
-        }
-
         const { vista } = req.body;
-
-        // Validar campo obligatorio
-        if (!vista || vista.trim() === '') {
-            const error = new Error('El campo "vista" es obligatorio');
-            error.statusCode = 400;
-            return next(error);
-        }
-
-        // Validar longitud del campo
-        if (vista.length > 20) {
-            const error = new Error('El campo "vista" no puede exceder los 255 caracteres');
-            error.statusCode = 400;
-            return next(error);
-        }
 
         // Iniciar transacción
         transaction = await sequelize.transaction();
@@ -134,39 +113,10 @@ export const vistaPut = async (req, res, next) => {
     let transaction;
     
     try {
-        // Validar parámetro ID
         const { id } = req.params;
-        
-        if (!id || isNaN(parseInt(id))) {
-            const error = new Error('ID de vista inválido');
-            error.statusCode = 400;
-            return next(error);
-        }
-
         const vistaId = parseInt(id);
 
-        // Validar que existan datos en el body
-        if (!req.body || Object.keys(req.body).length === 0) {
-            const error = new Error('Datos para actualizar requeridos');
-            error.statusCode = 400;
-            return next(error);
-        }
-
         const { vista } = req.body;
-
-        // Validar campo obligatorio
-        if (!vista || vista.trim() === '') {
-            const error = new Error('El campo "vista" es obligatorio');
-            error.statusCode = 400;
-            return next(error);
-        }
-
-        // Validar longitud del campo según el modelo (20 caracteres)
-        if (vista.length > 20) {
-            const error = new Error('El campo "vista" no puede exceder los 20 caracteres');
-            error.statusCode = 400;
-            return next(error);
-        }
 
         // Iniciar transacción
         transaction = await sequelize.transaction();
@@ -253,50 +203,15 @@ export const vistaPatch = async (req, res, next) => {
     let transaction;
     
     try {
-        // Validar parámetro ID
         const { id } = req.params;
-        
-        if (!id || isNaN(parseInt(id))) {
-            const error = new Error('ID de vista inválido');
-            error.statusCode = 400;
-            return next(error);
-        }
-
         const vistaId = parseInt(id);
 
-        // Validar que existan datos en el body
-        if (!req.body || Object.keys(req.body).length === 0) {
-            const error = new Error('Datos para actualizar requeridos');
-            error.statusCode = 400;
-            return next(error);
-        }
-
         const { vista } = req.body;
-
-        // Para PATCH, el campo no es obligatorio (solo actualizar si se proporciona)
-        if (vista === undefined) {
-            const error = new Error('No se proporcionaron campos para actualizar');
-            error.statusCode = 400;
-            return next(error);
-        }
 
         // Si se proporciona el campo vista, validarlo
         let datosActualizar = {};
         
         if (vista !== undefined) {
-            if (vista === null || vista === '') {
-                const error = new Error('El campo "vista" no puede estar vacío');
-                error.statusCode = 400;
-                return next(error);
-            }
-            
-            // Validar longitud del campo según el modelo (20 caracteres)
-            if (vista.length > 20) {
-                const error = new Error('El campo "vista" no puede exceder los 20 caracteres');
-                error.statusCode = 400;
-                return next(error);
-            }
-            
             datosActualizar.vista = vista.trim();
         }
 
@@ -402,15 +317,7 @@ export const vistaDelete = async (req, res, next) => {
     let transaction;
     
     try {
-        // Validar parámetro ID
         const { id } = req.params;
-        
-        if (!id || isNaN(parseInt(id))) {
-            const error = new Error('ID de vista inválido');
-            error.statusCode = 400;
-            return next(error);
-        }
-
         const vistaId = parseInt(id);
 
         // Validar que no sea una vista del sistema (opcional, si tienes vistas protegidas)

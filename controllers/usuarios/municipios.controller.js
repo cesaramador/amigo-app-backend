@@ -4,11 +4,11 @@ import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
 // Helper: obtener longitud máxima del atributo desde el modelo
-const getMaxLength = (field) => {
-    const attrs = Municipio.rawAttributes || {};
+// const getMaxLength = (field) => {
+//    const attrs = Municipio.rawAttributes || {};
     // DataTypes.STRING(n) almacena n en type.options.length
-    return attrs[field]?.type?.options?.length ?? 100;
-};
+//    return attrs[field]?.type?.options?.length ?? 100;
+//};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/municipios
@@ -27,11 +27,7 @@ export const municipiosGet = async (req, res, next) => {
 
         // Filtro adicional por estado
         if (req.query.id_estado) {
-            const idEstadoFiltro = Number(req.query.id_estado);
-            if (!Number.isInteger(idEstadoFiltro) || idEstadoFiltro <= 0) {
-                return res.status(400).json({ success: false, message: 'id_estado de filtro inválido.' });
-            }
-            where.id_estado = idEstadoFiltro;
+            where.id_estado = Number(req.query.id_estado);
         }
 
         // Orden seguro
@@ -69,9 +65,6 @@ export const municipiosGet = async (req, res, next) => {
 export const municipioGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const municipio = await Municipio.findByPk(id);
 
@@ -93,27 +86,9 @@ export const municipioGetById = async (req, res, next) => {
 export const municipioPost = async (req, res, next) => {
     try {
         const { id_estado, num_municipio, municipio } = req.body;
-
-        // Validaciones básicas de presencia y tipo
         const idEstadoNum = Number(id_estado);
-        if (!Number.isInteger(idEstadoNum) || idEstadoNum <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo id_estado es obligatorio y debe ser un entero positivo.' });
-        }
         const numMunicipioNum = Number(num_municipio);
-        if (!Number.isInteger(numMunicipioNum) || numMunicipioNum <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo num_municipio es obligatorio y debe ser un entero positivo.' });
-        }
-        if (!municipio || typeof municipio !== 'string' || municipio.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo municipio es obligatorio y debe ser texto.' });
-        }
-
         const municipioTrim = municipio.trim();
-
-        // Validación de longitud máxima
-        const maxLen = getMaxLength('municipio');
-        if (municipioTrim.length > maxLen) {
-            return res.status(400).json({ success: false, message: `El campo municipio no puede exceder ${maxLen} caracteres.` });
-        }
 
         // Verificación de FK + duplicados + creación dentro de la misma transacción
         const nuevo = await sequelize.transaction(async (t) => {
@@ -173,39 +148,13 @@ export const municipioPost = async (req, res, next) => {
 export const municipioPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const { id_estado, num_municipio, municipio } = req.body;
-
-        // PUT requiere todos los campos
-        if (id_estado === undefined || num_municipio === undefined || municipio === undefined) {
-            return res.status(400).json({
-                success: false,
-                message: 'Se requieren los campos: id_estado, num_municipio y municipio.'
-            });
-        }
 
         const idEstadoNum    = Number(id_estado);
         const numMunicipioNum = Number(num_municipio);
 
-        if (!Number.isInteger(idEstadoNum) || idEstadoNum <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo id_estado debe ser un entero positivo.' });
-        }
-        if (!Number.isInteger(numMunicipioNum) || numMunicipioNum <= 0) {
-            return res.status(400).json({ success: false, message: 'El campo num_municipio debe ser un entero positivo.' });
-        }
-        if (typeof municipio !== 'string' || municipio.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo municipio debe ser texto no vacío.' });
-        }
-
         const municipioTrim = municipio.trim();
-
-        const maxLength = getMaxLength('municipio');
-        if (municipioTrim.length > maxLength) {
-            return res.status(400).json({ success: false, message: `El campo municipio no puede exceder ${maxLength} caracteres.` });
-        }
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await Municipio.findByPk(id, { transaction: t });
@@ -274,40 +223,8 @@ export const municipioPut = async (req, res, next) => {
 export const municipioPatch = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const { id_estado, num_municipio, municipio } = req.body;
-
-        // Al menos un campo debe estar presente
-        const hasAny = id_estado !== undefined || num_municipio !== undefined || municipio !== undefined;
-        if (!hasAny) {
-            return res.status(400).json({ success: false, message: 'Se debe proporcionar al menos un campo para actualizar.' });
-        }
-
-        // Validaciones parciales de tipo
-        if (id_estado !== undefined) {
-            const v = Number(id_estado);
-            if (!Number.isInteger(v) || v <= 0) {
-                return res.status(400).json({ success: false, message: 'El campo id_estado debe ser un entero positivo.' });
-            }
-        }
-        if (num_municipio !== undefined) {
-            const v = Number(num_municipio);
-            if (!Number.isInteger(v) || v <= 0) {
-                return res.status(400).json({ success: false, message: 'El campo num_municipio debe ser un entero positivo.' });
-            }
-        }
-        if (municipio !== undefined) {
-            if (typeof municipio !== 'string' || municipio.trim() === '') {
-                return res.status(400).json({ success: false, message: 'El campo municipio debe ser texto no vacío.' });
-            }
-            const maxLength = getMaxLength('municipio');
-            if (municipio.trim().length > maxLength) {
-                return res.status(400).json({ success: false, message: `El campo municipio no puede exceder ${maxLength} caracteres.` });
-            }
-        }
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await Municipio.findByPk(id, { transaction: t });
@@ -384,9 +301,6 @@ export const municipioPatch = async (req, res, next) => {
 export const municipioDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const deleted = await sequelize.transaction(async (t) => {
             const record = await Municipio.findByPk(id, { transaction: t });

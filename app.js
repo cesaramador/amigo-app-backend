@@ -9,7 +9,6 @@ import authRouter from './routes/login/auth.routes.js';
 
 // importar rutas para usuarios
 import usuarioRouter from './routes/usuarios/usuarios.routes.js';
-import registroPublicoRouter from './routes/usuarios/registro-publico.routes.js';
 import generoRouter from './routes/usuarios/generos.routes.js';
 import estadoRouter from './routes/usuarios/estados.routes.js';
 import municipioRouter from './routes/usuarios/municipios.routes.js';
@@ -17,6 +16,7 @@ import categoriasviviendaRouter from './routes/usuarios/categoriaviviendas.route
 import estatusmaritalRouter from './routes/usuarios/estatusmaritales.routes.js';
 import estatususuarioRouter from './routes/usuarios/estatususuarios.routes.js';
 import tiposusuarioRouter from './routes/usuarios/tiposusuarios.routes.js';
+import registroPublicoRouter from './routes/usuarios/registropublico.routes.js';
 
 // importar rutas para matriz de accesos
 import vistaRouter from './routes/matriz/vistas.routes.js';
@@ -195,9 +195,6 @@ app.use(securityMiddleware({
 // registrar rutas para autenticación
 app.use('/api/v1/auth', authRouter);
 
-// registro público de usuarios (sin token)
-app.use('/api/v1/registro-publico', registroPublicoRouter);
-
 // registrar vista
 app.use('/api/v1/vistas', vistaRouter);
 
@@ -214,6 +211,9 @@ app.use('/api/v1/estatusmaritales', estatusmaritalRouter);
 app.use('/api/v1/estatususuarios', estatususuarioRouter);
 app.use('/api/v1/categoriasviviendas', categoriasviviendaRouter);
 app.use('/api/v1/tiposusuarios', tiposusuarioRouter);
+
+// registro público de usuarios (sin token)
+app.use('/api/v1/registropublico', registroPublicoRouter);
 
 // ********************************************************************************************
 // api para los grupos

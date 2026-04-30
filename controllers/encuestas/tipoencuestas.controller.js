@@ -7,16 +7,16 @@ const ALLOWED_SORT_FIELDS = ['id_tipoencuesta', 'tipo_encuesta'];
 const DEFAULT_SORT_FIELD  = 'id_tipoencuesta';
 
 // ─── Longitudes máximas derivadas del modelo ──────────────────────────────────
-const MAX_TIPO_ENCUESTA = 50;
+// const MAX_TIPO_ENCUESTA = 50;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /tipoencuestas  →  lista paginada con búsqueda y ordenamiento
 // ─────────────────────────────────────────────────────────────────────────────
 export const tipoencuestasGet = async (req, res, next) => {
     try {
-        // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page,  10) || 1);
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        // Parametros ya validados/sanitizados por middleware
+        const page   = req.query.page || 1;
+        const limit  = req.query.limit || 10;
         const offset = (page - 1) * limit;
 
         // Búsqueda por texto sobre el campo tipo_encuesta
@@ -56,13 +56,7 @@ export const tipoencuestasGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const tipoencuestaGetById = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         // Lectura simple: sin transacción explícita
         const registro = await TipoEncuestas.findByPk(id);
@@ -87,21 +81,7 @@ export const tipoencuestaGetById = async (req, res, next) => {
 export const tipoencuestaPost = async (req, res, next) => {
     try {
         const { tipo_encuesta } = req.body;
-
-        // ── Validación: tipo_encuesta ────────────────────────────────────────
-        if (!tipo_encuesta || typeof tipo_encuesta !== 'string' || tipo_encuesta.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo tipo_encuesta es obligatorio'
-            });
-        }
         const value = tipo_encuesta.trim();
-        if (value.length > MAX_TIPO_ENCUESTA) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_encuesta no puede exceder ${MAX_TIPO_ENCUESTA} caracteres`
-            });
-        }
 
         // Verificar duplicado
         const exists = await TipoEncuestas.findOne({ where: { tipo_encuesta: value } });
@@ -133,28 +113,10 @@ export const tipoencuestaPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const tipoencuestaPut = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const { tipo_encuesta } = req.body;
-        if (!tipo_encuesta || typeof tipo_encuesta !== 'string' || tipo_encuesta.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo tipo_encuesta es obligatorio'
-            });
-        }
         const value = tipo_encuesta.trim();
-        if (value.length > MAX_TIPO_ENCUESTA) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_encuesta no puede exceder ${MAX_TIPO_ENCUESTA} caracteres`
-            });
-        }
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await TipoEncuestas.findByPk(id, { transaction: t });
@@ -204,35 +166,10 @@ export const tipoencuestaPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const tipoencuestaPatch = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const { tipo_encuesta } = req.body;
-        if (typeof tipo_encuesta === 'undefined' || tipo_encuesta === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo tipo_encuesta es requerido'
-            });
-        }
-        if (typeof tipo_encuesta !== 'string' || tipo_encuesta.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo tipo_encuesta no es válido'
-            });
-        }
-
         const value = tipo_encuesta.trim();
-        if (value.length > MAX_TIPO_ENCUESTA) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_encuesta no puede exceder ${MAX_TIPO_ENCUESTA} caracteres`
-            });
-        }
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await TipoEncuestas.findByPk(id, { transaction: t });
@@ -284,13 +221,7 @@ export const tipoencuestaPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const tipoencuestaDelete = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await TipoEncuestas.findByPk(id, { transaction: t });

@@ -24,26 +24,12 @@ export const proveedoresconserviciosGet = async (req, res, next) => {
 
         // Filtro opcional por id_usuario
         if (req.query.id_usuario !== undefined) {
-            const idUsr = parseInt(req.query.id_usuario, 10);
-            if (!Number.isInteger(idUsr) || idUsr <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El parámetro id_usuario debe ser un entero positivo'
-                });
-            }
-            where.id_usuario = idUsr;
+            where.id_usuario = parseInt(req.query.id_usuario, 10);
         }
 
         // Filtro opcional por id_servicio_proveedor
         if (req.query.id_servicio_proveedor !== undefined) {
-            const idSrv = parseInt(req.query.id_servicio_proveedor, 10);
-            if (!Number.isInteger(idSrv) || idSrv <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El parámetro id_servicio_proveedor debe ser un entero positivo'
-                });
-            }
-            where.id_servicio_proveedor = idSrv;
+            where.id_servicio_proveedor = parseInt(req.query.id_servicio_proveedor, 10);
         }
 
         // Ordenamiento seguro
@@ -80,12 +66,6 @@ export const proveedoresconserviciosGet = async (req, res, next) => {
 export const proveedoresconservicioGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         // Lectura simple: sin transacción explícita
         const registro = await ProveedoresConServicios.findByPk(id);
@@ -111,23 +91,8 @@ export const proveedoresconservicioPost = async (req, res, next) => {
     try {
         const { id_usuario, id_servicio_proveedor } = req.body;
 
-        // ── Validación: id_usuario ───────────────────────────────────────────
         const idUsr = parseInt(id_usuario, 10);
-        if (!Number.isInteger(idUsr) || idUsr <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_usuario debe ser un entero positivo'
-            });
-        }
-
-        // ── Validación: id_servicio_proveedor ────────────────────────────────
         const idSrv = parseInt(id_servicio_proveedor, 10);
-        if (!Number.isInteger(idSrv) || idSrv <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_servicio_proveedor debe ser un entero positivo'
-            });
-        }
 
         // Verificar duplicado: combinación única id_usuario + id_servicio_proveedor
         const exists = await ProveedoresConServicios.findOne({
@@ -168,31 +133,11 @@ export const proveedoresconservicioPost = async (req, res, next) => {
 export const proveedoresconservicioPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const { id_usuario, id_servicio_proveedor } = req.body;
 
-        // ── Validaciones ─────────────────────────────────────────────────────
         const idUsr = parseInt(id_usuario, 10);
-        if (!Number.isInteger(idUsr) || idUsr <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_usuario debe ser un entero positivo'
-            });
-        }
-
         const idSrv = parseInt(id_servicio_proveedor, 10);
-        if (!Number.isInteger(idSrv) || idSrv <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_servicio_proveedor debe ser un entero positivo'
-            });
-        }
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await ProveedoresConServicios.findByPk(id, { transaction: t });
@@ -250,45 +195,18 @@ export const proveedoresconservicioPut = async (req, res, next) => {
 export const proveedoresconservicioPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const { id_usuario, id_servicio_proveedor } = req.body;
 
-        // Al menos un campo debe venir en el body
-        if (id_usuario === undefined && id_servicio_proveedor === undefined) {
-            return res.status(400).json({
-                success: false,
-                message: 'Debe proporcionar al menos un campo para actualizar: id_usuario, id_servicio_proveedor'
-            });
-        }
-
-        // ── Validaciones de los campos presentes ─────────────────────────────
         const updates = {};
 
         if (id_usuario !== undefined) {
             const idUsr = parseInt(id_usuario, 10);
-            if (!Number.isInteger(idUsr) || idUsr <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_usuario debe ser un entero positivo'
-                });
-            }
             updates.id_usuario = idUsr;
         }
 
         if (id_servicio_proveedor !== undefined) {
             const idSrv = parseInt(id_servicio_proveedor, 10);
-            if (!Number.isInteger(idSrv) || idSrv <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_servicio_proveedor debe ser un entero positivo'
-                });
-            }
             updates.id_servicio_proveedor = idSrv;
         }
 
@@ -345,12 +263,6 @@ export const proveedoresconservicioPatch = async (req, res, next) => {
 export const proveedoresconservicioDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await ProveedoresConServicios.findByPk(id, { transaction: t });

@@ -3,11 +3,11 @@ import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
 // Helper: obtener longitud máxima del atributo desde el modelo
-const getMaxLength = (field) => {
-    const attrs = Estado.rawAttributes || {};
+// const getMaxLength = (field) => {
+//    const attrs = Estado.rawAttributes || {};
     // DataTypes.STRING(n) almacena n en type.options.length
-    return attrs[field]?.type?.options?.length ?? 100;
-};
+//    return attrs[field]?.type?.options?.length ?? 100;
+//};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/estados
@@ -59,9 +59,6 @@ export const estadosGet = async (req, res, next) => {
 export const estadoGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const estado = await Estado.findByPk(id);
 
@@ -82,23 +79,7 @@ export const estadoGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const estadoPost = async (req, res, next) => {
     try {
-        const { estado } = req.body;
-
-        // Validación de presencia y tipo
-        if (!estado || typeof estado !== 'string' || estado.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estado es obligatorio y debe ser texto.' });
-        }
-
-        const value = estado.trim();
-
-        // Validación de longitud máxima desde el modelo
-        const maxLength = getMaxLength('estado');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estado no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.estado).trim();
 
         // Verificación de duplicado + creación dentro de la misma transacción
         const nuevoEstado = await sequelize.transaction(async (t) => {
@@ -136,27 +117,7 @@ export const estadoPost = async (req, res, next) => {
 export const estadoPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const { estado } = req.body;
-
-        // Validación de presencia y tipo (una sola vez, sin duplicar)
-        if (!estado || typeof estado !== 'string' || estado.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estado es obligatorio y debe ser texto.' });
-        }
-
-        const value = estado.trim();
-
-        // Validación de longitud máxima desde el modelo
-        const maxLength = getMaxLength('estado');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estado no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.estado).trim();
 
         // Búsqueda, verificación de duplicado y actualización en una sola transacción
         const estadoActualizado = await sequelize.transaction(async (t) => {
@@ -208,29 +169,7 @@ export const estadoPut = async (req, res, next) => {
 export const estadoPatch = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const { estado } = req.body;
-
-        // El campo es el único actualizable; debe estar presente
-        if (estado === undefined || estado === null) {
-            return res.status(400).json({ success: false, message: 'El campo estado es requerido.' });
-        }
-        if (typeof estado !== 'string' || estado.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estado debe ser texto no vacío.' });
-        }
-
-        const value = estado.trim();
-
-        const maxLength = getMaxLength('estado');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estado no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.estado).trim();
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await Estado.findByPk(id, { transaction: t });
@@ -281,9 +220,6 @@ export const estadoPatch = async (req, res, next) => {
 export const estadoDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const deleted = await sequelize.transaction(async (t) => {
             const record = await Estado.findByPk(id, { transaction: t });

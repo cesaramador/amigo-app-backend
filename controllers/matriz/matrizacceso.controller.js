@@ -62,18 +62,6 @@ export const matrizaccesoPost = async (req, res) => {
     const t = await sequelize.transaction(); // iniciar transacción
 
     try {
-        // Validación simple de parámetros requeridos
-        if (
-            id_tipousuario === undefined ||
-            id_vista === undefined ||
-            estatus === undefined
-        ) {
-            await t.rollback();
-            return res.status(400).json({
-                error: "Faltan datos obligatorios: id_tipousuario, id_vista, estatus"
-            });
-        }
-
         // (opcional) validar duplicado: evitar misma combinación tipousuario-vista
         const existente = await MatrizAccesos.findOne({
             where: { id_tipousuario, id_vista },
@@ -115,18 +103,6 @@ export const matrizaccesoPut = async (req, res) => {
     const t = await sequelize.transaction(); // iniciar transacción
 
     try {
-        // Validar campos obligatorios
-        if (
-            id_tipousuario === undefined ||
-            id_vista === undefined ||
-            estatus === undefined
-        ) {
-            await t.rollback();
-            return res.status(400).json({
-                error: "Faltan datos obligatorios: id_tipousuario, id_vista, estatus"
-            });
-        }
-
         // Verificar existencia del registro
         const registro = await MatrizAccesos.findByPk(id, { transaction: t });
 
@@ -200,14 +176,6 @@ export const matrizaccesoPatch = async (req, res) => {
         if (id_tipousuario !== undefined) camposActualizables.id_tipousuario = id_tipousuario;
         if (id_vista !== undefined) camposActualizables.id_vista = id_vista;
         if (estatus !== undefined) camposActualizables.estatus = estatus;
-
-        // Evitar PATCH vacío
-        if (Object.keys(camposActualizables).length === 0) {
-            await t.rollback();
-            return res.status(400).json({
-                error: "No se proporcionaron campos para actualizar."
-            });
-        }
 
         // (Opcional) Verificar duplicado si se envía combo tipousuario + vista
         if (camposActualizables.id_tipousuario || camposActualizables.id_vista) {

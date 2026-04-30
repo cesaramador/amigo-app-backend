@@ -2,13 +2,11 @@ import Usuario from "../../models/usuarios/usuarios.model.js";
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 import bcrypt from "bcryptjs";
+import { generarCodigoAccesoPlain, sendVerificationEmail } from '../../helpers/codigo-acceso-email.js';
 import {
     ALLOWED_WRITE_FIELDS,
-    buildPayload,
-    getModelMaxLengths,
-    validateFormats
+    buildPayload
 } from '../../helpers/usuario-registro-payload.js';
-import { persistirNuevoUsuarioConCodigo } from '../../services/usuario-alta.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/usuarios
@@ -78,9 +76,6 @@ export const usuariosGet = async (req, res, next) => {
 export const usuarioGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const usuario = await Usuario.findByPk(id, {
             attributes: { exclude: ['codigo'] }
@@ -103,35 +98,53 @@ export const usuarioGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const usuarioPost = async (req, res, next) => {
     try {
-        const maxLengths = getModelMaxLengths();
-
         // Construir payload con lista blanca
         const payload = buildPayload(req.body, ALLOWED_WRITE_FIELDS);
         if (payload.email !== undefined && payload.email !== null) {
             payload.email = String(payload.email).trim().toLowerCase();
         }
 
-        // Validar campos obligatorios según modelo (allowNull: false sin defaultValue ni PK)
-        const attrs = Usuario.rawAttributes || {};
-        const requiredFields = Object.keys(attrs).filter(name => {
-            const m = attrs[name];
-            return m.allowNull === false && !m.primaryKey && m.defaultValue === undefined && name !== 'codigo' && name !== 'fecha_registro';
-        });
-        const missing = requiredFields.filter(f => {
-            const v = payload[f];
-            return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
-        });
-        if (missing.length) {
-            return res.status(400).json({ success: false, message: 'Faltan campos obligatorios.', fields: missing });
-        }
+        const codigoPlain = generarCodigoAccesoPlain();
+        const codigoHash = await bcrypt.hash(codigoPlain, 10);
 
-        // Validar formatos y longitudes
-        const formatErrors = validateFormats(payload, maxLengths);
-        if (formatErrors.length) {
-            return res.status(400).json({ success: false, message: 'Errores de formato en los datos.', fields: formatErrors });
-        }
+        const data = {
+            ...payload,
+            codigo: codigoHash,
+            fecha_registro: new Date()
+        };
 
-        const { userSafe } = await persistirNuevoUsuarioConCodigo(payload);
+        const nuevoUsuario = await sequelize.transaction(async (t) => {
+            if (data.email) {
+                const existsEmail = await Usuario.findOne({
+                    where: { email: data.email },
+                    transaction: t
+                });
+                if (existsEmail) {
+                    const err = new Error('El email ya está registrado.');
+                    err.statusCode = 409;
+                    err.field = 'email';
+                    throw err;
+                }
+            }
+            if (data.telefono_personal) {
+                const existsTel = await Usuario.findOne({
+                    where: { telefono_personal: data.telefono_personal },
+                    transaction: t
+                });
+                if (existsTel) {
+                    const err = new Error('El teléfono personal ya está registrado.');
+                    err.statusCode = 409;
+                    err.field = 'telefono_personal';
+                    throw err;
+                }
+            }
+            return await Usuario.create(data, { transaction: t });
+        });
+
+        sendVerificationEmail(data.email, data.nombre, codigoPlain);
+
+        const userSafe = nuevoUsuario.get({ plain: true });
+        delete userSafe.codigo;
 
         return res.status(201).json({
             success: true,
@@ -157,11 +170,6 @@ export const usuarioPost = async (req, res, next) => {
 export const usuarioPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const maxLengths = getModelMaxLengths();
         const payload = buildPayload(req.body, ALLOWED_WRITE_FIELDS);
 
         if (Object.keys(payload).length === 0) {
@@ -171,12 +179,6 @@ export const usuarioPut = async (req, res, next) => {
         // Si se actualiza el codigo, hashearlo antes de guardar
         if (payload.codigo) {
             payload.codigo = await bcrypt.hash(String(payload.codigo), 10);
-        }
-
-        // Validar formatos y longitudes
-        const formatErrors = validateFormats(payload, maxLengths);
-        if (formatErrors.length) {
-            return res.status(400).json({ success: false, message: 'Errores de formato en los datos.', fields: formatErrors });
         }
 
         // Verificar unicidad + actualización en una sola transacción
@@ -247,11 +249,6 @@ export const usuarioPut = async (req, res, next) => {
 export const usuarioPatch = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const maxLengths = getModelMaxLengths();
         const payload = buildPayload(req.body, ALLOWED_WRITE_FIELDS);
 
         if (Object.keys(payload).length === 0) {
@@ -261,12 +258,6 @@ export const usuarioPatch = async (req, res, next) => {
         // Si se actualiza el codigo, hashearlo antes de guardar
         if (payload.codigo) {
             payload.codigo = await bcrypt.hash(String(payload.codigo), 10);
-        }
-
-        // Validar formatos y longitudes
-        const formatErrors = validateFormats(payload, maxLengths);
-        if (formatErrors.length) {
-            return res.status(400).json({ success: false, message: 'Errores de formato en los datos.', fields: formatErrors });
         }
 
         // Verificar unicidad + actualización en una sola transacción
@@ -337,9 +328,6 @@ export const usuarioPatch = async (req, res, next) => {
 export const usuarioDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const deleted = await sequelize.transaction(async (t) => {
             const record = await Usuario.findByPk(id, { transaction: t });

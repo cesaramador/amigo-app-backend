@@ -11,9 +11,9 @@ const DEFAULT_SORT_FIELD  = 'id_estatusgrupo';
 // ─────────────────────────────────────────────────────────────────────────────
 export const estatusgruposGet = async (req, res, next) => {
     try {
-        // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        // Parametros ya validados/sanitizados por middleware
+        const page   = req.query.page || 1;
+        const limit  = req.query.limit || 10;
         const offset = (page - 1) * limit;
 
         // Búsqueda por texto sobre el campo correcto
@@ -53,10 +53,7 @@ export const estatusgruposGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const estatusgrupoGetById = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         // Lectura simple: sin transacción explícita
         const registro = await EstatusGrupo.findByPk(id);
@@ -78,24 +75,7 @@ export const estatusgrupoGetById = async (req, res, next) => {
 export const estatusgrupoPost = async (req, res, next) => {
     try {
         const { estatus_grupo } = req.body;
-
-        // Validación básica
-        if (!estatus_grupo || typeof estatus_grupo !== 'string' || estatus_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_grupo es obligatorio' });
-        }
         const value = estatus_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = EstatusGrupo.rawAttributes || {};
-        const maxLength = attrs.estatus_grupo?.type?.options?.length
-                       ?? attrs.estatus_grupo?._length
-                       ?? 20;
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estatus_grupo no puede exceder ${maxLength} caracteres`
-            });
-        }
 
         // Verificar duplicado
         const exists = await EstatusGrupo.findOne({ where: { estatus_grupo: value } });
@@ -124,28 +104,10 @@ export const estatusgrupoPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const estatusgrupoPut = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const { estatus_grupo } = req.body;
-        if (!estatus_grupo || typeof estatus_grupo !== 'string' || estatus_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_grupo es obligatorio' });
-        }
         const value = estatus_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = EstatusGrupo.rawAttributes || {};
-        const maxLength = attrs.estatus_grupo?.type?.options?.length
-                       ?? attrs.estatus_grupo?._length
-                       ?? 20;
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estatus_grupo no puede exceder ${maxLength} caracteres`
-            });
-        }
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await EstatusGrupo.findByPk(id, { transaction: t });
@@ -189,32 +151,10 @@ export const estatusgrupoPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const estatusgrupoPatch = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const { estatus_grupo } = req.body;
-        if (typeof estatus_grupo === 'undefined' || estatus_grupo === null) {
-            return res.status(400).json({ success: false, message: 'El campo estatus_grupo es requerido' });
-        }
-        if (typeof estatus_grupo !== 'string' || estatus_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_grupo no es válido' });
-        }
-
         const value = estatus_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = EstatusGrupo.rawAttributes || {};
-        const maxLength = attrs.estatus_grupo?.type?.options?.length
-                       ?? attrs.estatus_grupo?._length
-                       ?? 20;
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estatus_grupo no puede exceder ${maxLength} caracteres`
-            });
-        }
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await EstatusGrupo.findByPk(id, { transaction: t });
@@ -260,10 +200,7 @@ export const estatusgrupoPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const estatusgrupoDelete = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await EstatusGrupo.findByPk(id, { transaction: t });

@@ -3,11 +3,11 @@ import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
 // Helper: obtener longitud máxima del atributo desde el modelo
-const getMaxLength = (field) => {
-    const attrs = EstatusMaritales.rawAttributes || {};
+// const getMaxLength = (field) => {
+//    const attrs = EstatusMaritales.rawAttributes || {};
     // DataTypes.STRING(n) almacena n en type.options.length
-    return attrs[field]?.type?.options?.length ?? 20;
-};
+//    return attrs[field]?.type?.options?.length ?? 20;
+//};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/estatusmaritales
@@ -59,9 +59,6 @@ export const estatusmaritalesGet = async (req, res, next) => {
 export const estatusmaritalGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const registro = await EstatusMaritales.findByPk(id);
 
@@ -82,23 +79,7 @@ export const estatusmaritalGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const estatusmaritalPost = async (req, res, next) => {
     try {
-        const { estatus_marital } = req.body;
-
-        // Validación de presencia y tipo
-        if (!estatus_marital || typeof estatus_marital !== 'string' || estatus_marital.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_marital es obligatorio y debe ser texto.' });
-        }
-
-        const value = estatus_marital.trim();
-
-        // Validación de longitud máxima desde el modelo
-        const maxLength = getMaxLength('estatus_marital');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estatus_marital no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.estatus_marital).trim();
 
         // Verificación de duplicado (case-insensitive) + creación dentro de la misma transacción
         const nuevo = await sequelize.transaction(async (t) => {
@@ -139,24 +120,7 @@ export const estatusmaritalPost = async (req, res, next) => {
 export const estatusmaritalPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const { estatus_marital } = req.body;
-        if (!estatus_marital || typeof estatus_marital !== 'string' || estatus_marital.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_marital es obligatorio y debe ser texto.' });
-        }
-
-        const value = estatus_marital.trim();
-
-        const maxLength = getMaxLength('estatus_marital');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estatus_marital no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.estatus_marital).trim();
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await EstatusMaritales.findByPk(id, { transaction: t });
@@ -212,29 +176,7 @@ export const estatusmaritalPut = async (req, res, next) => {
 export const estatusmaritalPatch = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const { estatus_marital } = req.body;
-
-        // El campo es el único actualizable; debe estar presente
-        if (estatus_marital === undefined || estatus_marital === null) {
-            return res.status(400).json({ success: false, message: 'El campo estatus_marital es requerido.' });
-        }
-        if (typeof estatus_marital !== 'string' || estatus_marital.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo estatus_marital debe ser texto no vacío.' });
-        }
-
-        const value = estatus_marital.trim();
-
-        const maxLength = getMaxLength('estatus_marital');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo estatus_marital no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.estatus_marital).trim();
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await EstatusMaritales.findByPk(id, { transaction: t });
@@ -290,9 +232,6 @@ export const estatusmaritalPatch = async (req, res, next) => {
 export const estatusmaritalDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const deleted = await sequelize.transaction(async (t) => {
             const record = await EstatusMaritales.findByPk(id, { transaction: t });

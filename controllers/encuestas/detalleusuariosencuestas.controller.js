@@ -2,12 +2,6 @@ import DetalleUsuariosEncuestas from "../../models/encuestas/detalleusuariosencu
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
-// ─── Helper: parsear entero positivo ─────────────────────────────────────────
-const parsePositiveInt = (value) => {
-    const n = parseInt(value, 10);
-    return Number.isInteger(n) && n > 0 ? n : null;
-};
-
 // ─── Campos permitidos para ordenamiento ─────────────────────────────────────
 const ALLOWED_SORT_FIELDS = [
     'id_detalle_usuario_encuesta', 'id_usuario_encuesta', 'id_encuesta_pregunta_respuesta'
@@ -19,9 +13,9 @@ const DEFAULT_SORT_FIELD = 'id_detalle_usuario_encuesta';
 // ─────────────────────────────────────────────────────────────────────────────
 export const detalleusuariosencuestasGet = async (req, res, next) => {
     try {
-        // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        // Parametros ya validados/sanitizados por middleware
+        const page   = req.query.page || 1;
+        const limit  = req.query.limit || 10;
         const offset = (page - 1) * limit;
 
         // Filtros opcionales por clave foránea
@@ -29,14 +23,7 @@ export const detalleusuariosencuestasGet = async (req, res, next) => {
         const fkFilters = ['id_usuario_encuesta', 'id_encuesta_pregunta_respuesta'];
         for (const field of fkFilters) {
             if (req.query[field] !== undefined) {
-                const val = parsePositiveInt(req.query[field]);
-                if (val === null) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `El parámetro ${field} debe ser un entero positivo`
-                    });
-                }
-                where[field] = val;
+                where[field] = req.query[field];
             }
         }
 
@@ -73,10 +60,7 @@ export const detalleusuariosencuestasGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const detalleusuarioencuestaGetById = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         // Lectura simple: sin transacción explícita
         const registro = await DetalleUsuariosEncuestas.findByPk(id);
@@ -98,23 +82,8 @@ export const detalleusuarioencuestaGetById = async (req, res, next) => {
 export const detalleusuarioencuestaPost = async (req, res, next) => {
     try {
         const { id_usuario_encuesta, id_encuesta_pregunta_respuesta } = req.body;
-
-        // Ambos campos son obligatorios (allowNull: false en el modelo)
-        const idUsuarioEncuesta            = parsePositiveInt(id_usuario_encuesta);
-        const idEncuestaPreguntaRespuesta  = parsePositiveInt(id_encuesta_pregunta_respuesta);
-
-        if (idUsuarioEncuesta === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_usuario_encuesta es obligatorio y debe ser un entero positivo'
-            });
-        }
-        if (idEncuestaPreguntaRespuesta === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_encuesta_pregunta_respuesta es obligatorio y debe ser un entero positivo'
-            });
-        }
+        const idUsuarioEncuesta           = id_usuario_encuesta;
+        const idEncuestaPreguntaRespuesta = id_encuesta_pregunta_respuesta;
 
         // Verificar duplicado de la combinación clave
         const existe = await DetalleUsuariosEncuestas.findOne({
@@ -157,29 +126,11 @@ export const detalleusuarioencuestaPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const detalleusuarioencuestaPut = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const { id_usuario_encuesta, id_encuesta_pregunta_respuesta } = req.body;
-
-        // Ambos campos obligatorios en PUT
-        const idUsuarioEncuesta           = parsePositiveInt(id_usuario_encuesta);
-        const idEncuestaPreguntaRespuesta = parsePositiveInt(id_encuesta_pregunta_respuesta);
-
-        if (idUsuarioEncuesta === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_usuario_encuesta es obligatorio y debe ser un entero positivo'
-            });
-        }
-        if (idEncuestaPreguntaRespuesta === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_encuesta_pregunta_respuesta es obligatorio y debe ser un entero positivo'
-            });
-        }
+        const idUsuarioEncuesta           = id_usuario_encuesta;
+        const idEncuestaPreguntaRespuesta = id_encuesta_pregunta_respuesta;
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await DetalleUsuariosEncuestas.findByPk(id, { transaction: t });
@@ -233,43 +184,19 @@ export const detalleusuarioencuestaPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const detalleusuarioencuestaPatch = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
-        const camposPermitidos = ['id_usuario_encuesta', 'id_encuesta_pregunta_respuesta'];
-        const camposRecibidos  = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
-
-        if (camposRecibidos.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Se requiere al menos uno de los campos: ${camposPermitidos.join(', ')}`
-            });
-        }
+        // const camposPermitidos = ['id_usuario_encuesta', 'id_encuesta_pregunta_respuesta'];
+        // const camposRecibidos  = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
 
         // Construir objeto de cambios validados
         const cambios = {};
 
         if ('id_usuario_encuesta' in req.body) {
-            const val = parsePositiveInt(req.body.id_usuario_encuesta);
-            if (val === null) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_usuario_encuesta debe ser un entero positivo'
-                });
-            }
-            cambios.id_usuario_encuesta = val;
+            cambios.id_usuario_encuesta = req.body.id_usuario_encuesta;
         }
         if ('id_encuesta_pregunta_respuesta' in req.body) {
-            const val = parsePositiveInt(req.body.id_encuesta_pregunta_respuesta);
-            if (val === null) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_encuesta_pregunta_respuesta debe ser un entero positivo'
-                });
-            }
-            cambios.id_encuesta_pregunta_respuesta = val;
+            cambios.id_encuesta_pregunta_respuesta = req.body.id_encuesta_pregunta_respuesta;
         }
 
         const actualizado = await sequelize.transaction(async (t) => {
@@ -332,10 +259,7 @@ export const detalleusuarioencuestaPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const detalleusuarioencuestaDelete = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await DetalleUsuariosEncuestas.findByPk(id, { transaction: t });

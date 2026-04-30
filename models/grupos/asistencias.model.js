@@ -4,25 +4,36 @@ import { sequelize } from '../../database/mysql.js';  // Importante: importar { 
 const Asistencias = sequelize.define('Asistencias', {
     id_asistencia: {
         type: DataTypes.INTEGER,
-        AUTO_INCREMENT: true,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false
     },
     id_inscripciongrupo: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'InscripcionesGrupos',
+            key: 'id_inscripciongrupo'
+        }
     },
     fecha: {
-        type: DataTypes.DATE,
-        allowNull: false
+        type: DataTypes.DATEONLY,
+        allowNull: true
     },
     asistencia: {
         type: DataTypes.BOOLEAN,
-        allowNull: false
+        allowNull: true
     }
 }, {
     timestamps: false,
     tableName: 'Asistencias'
 });
+
+Asistencias.associate = (models) => {
+    Asistencias.belongsTo(models.InscripcionesGrupos, {
+        foreignKey: 'id_inscripciongrupo',
+        targetKey: 'id_inscripciongrupo'
+    });
+};
 
 export default Asistencias;

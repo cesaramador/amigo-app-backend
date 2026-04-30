@@ -17,8 +17,16 @@ const Estados = sequelize.define('Estados', {
 },
 {
     timestamps: false,
-    tableName: 'Estados'
+    tableName: 'Estados',
+    indexes: [
+        { name: 'Idx_Estado', fields: ['id_estado'] }
+    ]
 });
+
+Estados.associate = (models) => {
+    Estados.hasMany(models.Usuarios, { foreignKey: 'id_estado', sourceKey: 'id_estado' });
+    Estados.hasMany(models.Municipios, { foreignKey: 'id_estado', sourceKey: 'id_estado' });
+};
 
 export default Estados;
 

@@ -7,7 +7,7 @@ const ALLOWED_SORT_FIELDS = ['id_tiposervicioproveedor', 'tipo_servicio_proveedo
 const DEFAULT_SORT_FIELD  = 'id_tiposervicioproveedor';
 
 // ─── Longitudes máximas derivadas del modelo ──────────────────────────────────
-const MAX_TIPO_SERVICIO_PROVEEDOR = 500;
+// const MAX_TIPO_SERVICIO_PROVEEDOR = 500;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /tiposserviciosproveedores  →  lista paginada con búsqueda y ordenamiento
@@ -57,12 +57,6 @@ export const tiposServiciosProveedoresGet = async (req, res, next) => {
 export const tiposServiciosProveedorGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         // Lectura simple: sin transacción explícita
         const registro = await TiposServiciosProveedores.findByPk(id);
@@ -86,22 +80,7 @@ export const tiposServiciosProveedorGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const tiposServiciosProveedorPost = async (req, res, next) => {
     try {
-        const { tipo_servicio_proveedor } = req.body;
-
-        // ── Validación ───────────────────────────────────────────────────────
-        if (!tipo_servicio_proveedor || typeof tipo_servicio_proveedor !== 'string' || tipo_servicio_proveedor.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo tipo_servicio_proveedor es obligatorio'
-            });
-        }
-        const value = tipo_servicio_proveedor.trim();
-        if (value.length > MAX_TIPO_SERVICIO_PROVEEDOR) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_servicio_proveedor no puede exceder ${MAX_TIPO_SERVICIO_PROVEEDOR} caracteres`
-            });
-        }
+        const value = String(req.body.tipo_servicio_proveedor).trim();
 
         // Verificar duplicado
         const exists = await TiposServiciosProveedores.findOne({ where: { tipo_servicio_proveedor: value } });
@@ -134,27 +113,7 @@ export const tiposServiciosProveedorPost = async (req, res, next) => {
 export const tiposServiciosProveedorPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
-
-        const { tipo_servicio_proveedor } = req.body;
-        if (!tipo_servicio_proveedor || typeof tipo_servicio_proveedor !== 'string' || tipo_servicio_proveedor.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo tipo_servicio_proveedor es obligatorio'
-            });
-        }
-        const value = tipo_servicio_proveedor.trim();
-        if (value.length > MAX_TIPO_SERVICIO_PROVEEDOR) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_servicio_proveedor no puede exceder ${MAX_TIPO_SERVICIO_PROVEEDOR} caracteres`
-            });
-        }
+        const value = String(req.body.tipo_servicio_proveedor).trim();
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await TiposServiciosProveedores.findByPk(id, { transaction: t });
@@ -163,7 +122,7 @@ export const tiposServiciosProveedorPut = async (req, res, next) => {
             // Verificar duplicado (excluir el propio registro)
             const duplicado = await TiposServiciosProveedores.findOne({
                 where: {
-                    tipo_servicio_proveedor,
+                    tipo_servicio_proveedor: value,
                     id_tiposervicioproveedor: { [Op.ne]: id }
                 },
                 transaction: t
@@ -205,34 +164,7 @@ export const tiposServiciosProveedorPut = async (req, res, next) => {
 export const tiposServiciosProveedorPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
-
-        const { tipo_servicio_proveedor } = req.body;
-        if (typeof tipo_servicio_proveedor === 'undefined' || tipo_servicio_proveedor === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo tipo_servicio_proveedor es requerido'
-            });
-        }
-        if (typeof tipo_servicio_proveedor !== 'string' || tipo_servicio_proveedor.trim() === '') {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo tipo_servicio_proveedor no es válido'
-            });
-        }
-
-        const value = tipo_servicio_proveedor.trim();
-        if (value.length > MAX_TIPO_SERVICIO_PROVEEDOR) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_servicio_proveedor no puede exceder ${MAX_TIPO_SERVICIO_PROVEEDOR} caracteres`
-            });
-        }
+        const value = String(req.body.tipo_servicio_proveedor).trim();
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await TiposServiciosProveedores.findByPk(id, { transaction: t });
@@ -285,12 +217,6 @@ export const tiposServiciosProveedorPatch = async (req, res, next) => {
 export const tiposServiciosProveedorDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await TiposServiciosProveedores.findByPk(id, { transaction: t });

@@ -2,12 +2,6 @@ import Encuestas from "../../models/encuestas/encuestas.model.js";
 import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
-// ─── Helper: parsear entero positivo ─────────────────────────────────────────
-const parsePositiveInt = (value) => {
-    const n = parseInt(value, 10);
-    return Number.isInteger(n) && n > 0 ? n : null;
-};
-
 // ─── Campos permitidos para ordenamiento ─────────────────────────────────────
 const ALLOWED_SORT_FIELDS = [
     'id_encuesta', 'nombre_encuesta', 'id_tipo_encuesta', 'id_estatus_enc_preg_resp'
@@ -19,9 +13,9 @@ const DEFAULT_SORT_FIELD = 'id_encuesta';
 // ─────────────────────────────────────────────────────────────────────────────
 export const encuestasGet = async (req, res, next) => {
     try {
-        // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page, 10)  || 1);
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        // Parametros ya validados/sanitizados por middleware
+        const page   = req.query.page || 1;
+        const limit  = req.query.limit || 10;
         const offset = (page - 1) * limit;
 
         // Búsqueda por texto en nombre_encuesta
@@ -33,14 +27,7 @@ export const encuestasGet = async (req, res, next) => {
         const fkFilters = ['id_tipo_encuesta', 'id_estatus_enc_preg_resp'];
         for (const field of fkFilters) {
             if (req.query[field] !== undefined) {
-                const val = parsePositiveInt(req.query[field]);
-                if (val === null) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `El parámetro ${field} debe ser un entero positivo`
-                    });
-                }
-                where[field] = val;
+                where[field] = req.query[field];
             }
         }
 
@@ -77,10 +64,7 @@ export const encuestasGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const encuestaGetById = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         // Lectura simple: sin transacción explícita
         const registro = await Encuestas.findByPk(id);
@@ -102,41 +86,9 @@ export const encuestaGetById = async (req, res, next) => {
 export const encuestaPost = async (req, res, next) => {
     try {
         const { nombre_encuesta, id_tipo_encuesta, id_estatus_enc_preg_resp } = req.body;
-
-        // Validar nombre_encuesta (obligatorio)
-        if (!nombre_encuesta || typeof nombre_encuesta !== 'string' || nombre_encuesta.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo nombre_encuesta es obligatorio' });
-        }
         const nombreValue = nombre_encuesta.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = Encuestas.rawAttributes || {};
-        const maxLength = attrs.nombre_encuesta?.type?.options?.length
-                       ?? attrs.nombre_encuesta?._length
-                       ?? 500;
-        if (nombreValue.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo nombre_encuesta no puede exceder ${maxLength} caracteres`
-            });
-        }
-
-        // Validar claves foráneas obligatorias
-        const idTipoEncuesta          = parsePositiveInt(id_tipo_encuesta);
-        const idEstatusEncPregResp    = parsePositiveInt(id_estatus_enc_preg_resp);
-
-        if (idTipoEncuesta === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_tipo_encuesta es obligatorio y debe ser un entero positivo'
-            });
-        }
-        if (idEstatusEncPregResp === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_estatus_enc_preg_resp es obligatorio y debe ser un entero positivo'
-            });
-        }
+        const idTipoEncuesta       = id_tipo_encuesta;
+        const idEstatusEncPregResp = id_estatus_enc_preg_resp;
 
         // Verificar duplicado de nombre para el mismo tipo de encuesta
         const existe = await Encuestas.findOne({
@@ -177,45 +129,12 @@ export const encuestaPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const encuestaPut = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const { nombre_encuesta, id_tipo_encuesta, id_estatus_enc_preg_resp } = req.body;
-
-        // Validar nombre_encuesta (obligatorio en PUT)
-        if (!nombre_encuesta || typeof nombre_encuesta !== 'string' || nombre_encuesta.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo nombre_encuesta es obligatorio' });
-        }
         const nombreValue = nombre_encuesta.trim();
-
-        const attrs     = Encuestas.rawAttributes || {};
-        const maxLength = attrs.nombre_encuesta?.type?.options?.length
-                       ?? attrs.nombre_encuesta?._length
-                       ?? 500;
-        if (nombreValue.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo nombre_encuesta no puede exceder ${maxLength} caracteres`
-            });
-        }
-
-        const idTipoEncuesta       = parsePositiveInt(id_tipo_encuesta);
-        const idEstatusEncPregResp = parsePositiveInt(id_estatus_enc_preg_resp);
-
-        if (idTipoEncuesta === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_tipo_encuesta es obligatorio y debe ser un entero positivo'
-            });
-        }
-        if (idEstatusEncPregResp === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_estatus_enc_preg_resp es obligatorio y debe ser un entero positivo'
-            });
-        }
+        const idTipoEncuesta       = id_tipo_encuesta;
+        const idEstatusEncPregResp = id_estatus_enc_preg_resp;
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await Encuestas.findByPk(id, { transaction: t });
@@ -275,63 +194,24 @@ export const encuestaPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const encuestaPatch = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
-        const camposPermitidos = ['nombre_encuesta', 'id_tipo_encuesta', 'id_estatus_enc_preg_resp'];
-        const camposRecibidos  = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
-
-        if (camposRecibidos.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Se requiere al menos uno de los campos: ${camposPermitidos.join(', ')}`
-            });
-        }
+        // const camposPermitidos = ['nombre_encuesta', 'id_tipo_encuesta', 'id_estatus_enc_preg_resp'];
+        //const camposRecibidos  = Object.keys(req.body).filter(k => camposPermitidos.includes(k));
 
         // Construir objeto de cambios validados
         const cambios = {};
 
         if ('nombre_encuesta' in req.body) {
-            const raw = req.body.nombre_encuesta;
-            if (!raw || typeof raw !== 'string' || raw.trim() === '') {
-                return res.status(400).json({ success: false, message: 'El campo nombre_encuesta no es válido' });
-            }
-            const trimmed = raw.trim();
-            const attrs     = Encuestas.rawAttributes || {};
-            const maxLength = attrs.nombre_encuesta?.type?.options?.length
-                           ?? attrs.nombre_encuesta?._length
-                           ?? 500;
-            if (trimmed.length > maxLength) {
-                return res.status(400).json({
-                    success: false,
-                    message: `El campo nombre_encuesta no puede exceder ${maxLength} caracteres`
-                });
-            }
-            cambios.nombre_encuesta = trimmed;
+            cambios.nombre_encuesta = req.body.nombre_encuesta.trim();
         }
 
         if ('id_tipo_encuesta' in req.body) {
-            const val = parsePositiveInt(req.body.id_tipo_encuesta);
-            if (val === null) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_tipo_encuesta debe ser un entero positivo'
-                });
-            }
-            cambios.id_tipo_encuesta = val;
+            cambios.id_tipo_encuesta = req.body.id_tipo_encuesta;
         }
 
         if ('id_estatus_enc_preg_resp' in req.body) {
-            const val = parsePositiveInt(req.body.id_estatus_enc_preg_resp);
-            if (val === null) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_estatus_enc_preg_resp debe ser un entero positivo'
-                });
-            }
-            cambios.id_estatus_enc_preg_resp = val;
+            cambios.id_estatus_enc_preg_resp = req.body.id_estatus_enc_preg_resp;
         }
 
         const actualizado = await sequelize.transaction(async (t) => {
@@ -385,10 +265,7 @@ export const encuestaPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const encuestaDelete = async (req, res, next) => {
     try {
-        const id = parsePositiveInt(req.params.id);
-        if (id === null) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
+        const { id } = req.params;
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await Encuestas.findByPk(id, { transaction: t });

@@ -18,8 +18,15 @@ const EstatusMaritales = sequelize.define('EstatusMaritales', {
 },
 {
     timestamps: false,
-    tableName: 'EstatusMaritales'
+    tableName: 'EstatusMaritales',
+    indexes: [
+        { name: 'Idx_EstatusMarital', fields: ['id_estatusmarital'] }
+    ]
 });
+
+EstatusMaritales.associate = (models) => {
+    EstatusMaritales.hasMany(models.Usuarios, { foreignKey: 'id_estatus_marital', sourceKey: 'id_estatusmarital' });
+};
 
 export default EstatusMaritales;
 

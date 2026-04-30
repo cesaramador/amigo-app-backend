@@ -3,11 +3,11 @@ import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
 // Helper: obtener longitud máxima del atributo desde el modelo
-const getMaxLength = (field) => {
-    const attrs = TiposUsuarios.rawAttributes || {};
-    // DataTypes.STRING(n) almacena n en type.options.length
-    return attrs[field]?.type?.options?.length ?? 50;
-};
+// const getMaxLength = (field) => {
+//     const attrs = TiposUsuarios.rawAttributes || {};
+//     // DataTypes.STRING(n) almacena n en type.options.length
+//     return attrs[field]?.type?.options?.length ?? 50;
+// };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/tiposusuarios
@@ -59,9 +59,6 @@ export const tiposusuariosGet = async (req, res, next) => {
 export const tipousuarioGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const registro = await TiposUsuarios.findByPk(id);
 
@@ -82,23 +79,7 @@ export const tipousuarioGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const tipousuarioPost = async (req, res, next) => {
     try {
-        const { tipo_usuario } = req.body;
-
-        // Validación de presencia y tipo
-        if (!tipo_usuario || typeof tipo_usuario !== 'string' || tipo_usuario.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo tipo_usuario es obligatorio y debe ser texto.' });
-        }
-
-        const value = tipo_usuario.trim();
-
-        // Validación de longitud máxima desde el modelo
-        const maxLength = getMaxLength('tipo_usuario');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_usuario no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.tipo_usuario).trim();
 
         // Verificación de duplicado (case-insensitive) + creación dentro de la misma transacción
         const nuevo = await sequelize.transaction(async (t) => {
@@ -139,24 +120,7 @@ export const tipousuarioPost = async (req, res, next) => {
 export const tipousuarioPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const { tipo_usuario } = req.body;
-        if (!tipo_usuario || typeof tipo_usuario !== 'string' || tipo_usuario.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo tipo_usuario es obligatorio y debe ser texto.' });
-        }
-
-        const value = tipo_usuario.trim();
-
-        const maxLength = getMaxLength('tipo_usuario');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_usuario no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.tipo_usuario).trim();
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await TiposUsuarios.findByPk(id, { transaction: t });
@@ -213,29 +177,7 @@ export const tipousuarioPut = async (req, res, next) => {
 export const tipousuarioPatch = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const { tipo_usuario } = req.body;
-
-        // El campo es el único actualizable; debe estar presente
-        if (tipo_usuario === undefined || tipo_usuario === null) {
-            return res.status(400).json({ success: false, message: 'El campo tipo_usuario es requerido.' });
-        }
-        if (typeof tipo_usuario !== 'string' || tipo_usuario.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo tipo_usuario debe ser texto no vacío.' });
-        }
-
-        const value = tipo_usuario.trim();
-
-        const maxLength = getMaxLength('tipo_usuario');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_usuario no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.tipo_usuario).trim();
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await TiposUsuarios.findByPk(id, { transaction: t });
@@ -291,9 +233,6 @@ export const tipousuarioPatch = async (req, res, next) => {
 export const tipousuarioDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const deleted = await sequelize.transaction(async (t) => {
             const record = await TiposUsuarios.findByPk(id, { transaction: t });

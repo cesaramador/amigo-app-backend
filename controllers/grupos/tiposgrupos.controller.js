@@ -54,9 +54,6 @@ export const tiposgruposGet = async (req, res, next) => {
 export const tiposgrupoGetById = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
 
         // Lectura simple: sin transacción explícita
         const registro = await TiposGrupos.findByPk(id);
@@ -77,25 +74,7 @@ export const tiposgrupoGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const tiposgrupoPost = async (req, res, next) => {
     try {
-        const { tipo_grupo } = req.body;
-
-        // Validar campo tipo_grupo (obligatorio)
-        if (!tipo_grupo || typeof tipo_grupo !== 'string' || tipo_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo tipo_grupo es obligatorio' });
-        }
-        const value = tipo_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = TiposGrupos.rawAttributes || {};
-        const maxLength = attrs.tipo_grupo?.type?.options?.length
-                       ?? attrs.tipo_grupo?._length
-                       ?? 100;
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_grupo no puede exceder ${maxLength} caracteres`
-            });
-        }
+        const value = String(req.body.tipo_grupo).trim();
 
         // Verificar duplicado (campo unique en el modelo)
         const existe = await TiposGrupos.findOne({ where: { tipo_grupo: value } });
@@ -125,29 +104,7 @@ export const tiposgrupoPost = async (req, res, next) => {
 export const tiposgrupoPut = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
-
-        const { tipo_grupo } = req.body;
-
-        // Validar campo tipo_grupo (obligatorio en PUT)
-        if (!tipo_grupo || typeof tipo_grupo !== 'string' || tipo_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo tipo_grupo es obligatorio' });
-        }
-        const value = tipo_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = TiposGrupos.rawAttributes || {};
-        const maxLength = attrs.tipo_grupo?.type?.options?.length
-                       ?? attrs.tipo_grupo?._length
-                       ?? 100;
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_grupo no puede exceder ${maxLength} caracteres`
-            });
-        }
+        const value = String(req.body.tipo_grupo).trim();
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await TiposGrupos.findByPk(id, { transaction: t });
@@ -194,32 +151,7 @@ export const tiposgrupoPut = async (req, res, next) => {
 export const tiposgrupoPatch = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
-
-        const { tipo_grupo } = req.body;
-
-        if (typeof tipo_grupo === 'undefined' || tipo_grupo === null) {
-            return res.status(400).json({ success: false, message: 'El campo tipo_grupo es requerido' });
-        }
-        if (typeof tipo_grupo !== 'string' || tipo_grupo.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo tipo_grupo no es válido' });
-        }
-
-        const value = tipo_grupo.trim();
-
-        // Longitud máxima obtenida del modelo
-        const attrs     = TiposGrupos.rawAttributes || {};
-        const maxLength = attrs.tipo_grupo?.type?.options?.length
-                       ?? attrs.tipo_grupo?._length
-                       ?? 100;
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo tipo_grupo no puede exceder ${maxLength} caracteres`
-            });
-        }
+        const value = String(req.body.tipo_grupo).trim();
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await TiposGrupos.findByPk(id, { transaction: t });
@@ -266,9 +198,6 @@ export const tiposgrupoPatch = async (req, res, next) => {
 export const tiposgrupoDelete = async (req, res, next) => {
     try {
         const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido: debe ser un entero positivo' });
-        }
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await TiposGrupos.findByPk(id, { transaction: t });

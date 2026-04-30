@@ -3,11 +3,11 @@ import { Op } from 'sequelize';
 import { sequelize } from '../../database/mysql.js';
 
 // Helper: obtener longitud máxima del atributo desde el modelo
-const getMaxLength = (field) => {
-    const attrs = Genero.rawAttributes || {};
+// const getMaxLength = (field) => {
+//    const attrs = Genero.rawAttributes || {};
     // DataTypes.STRING(n) almacena n en type.options.length
-    return attrs[field]?.type?.options?.length ?? 10;
-};
+//    return attrs[field]?.type?.options?.length ?? 10;
+//};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/generos
@@ -59,9 +59,6 @@ export const generosGet = async (req, res, next) => {
 export const generoGetById = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const genero = await Genero.findByPk(id);
 
@@ -82,23 +79,7 @@ export const generoGetById = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const generoPost = async (req, res, next) => {
     try {
-        const { genero } = req.body;
-
-        // Validación de presencia y tipo
-        if (!genero || typeof genero !== 'string' || genero.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo genero es obligatorio y debe ser texto.' });
-        }
-
-        const value = genero.trim();
-
-        // Validación de longitud máxima desde el modelo
-        const maxLength = getMaxLength('genero');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo genero no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.genero).trim();
 
         // Verificación de duplicado + creación dentro de la misma transacción
         const nuevoGenero = await sequelize.transaction(async (t) => {
@@ -136,26 +117,7 @@ export const generoPost = async (req, res, next) => {
 export const generoPut = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const { genero } = req.body;
-
-        // Una sola validación unificada (sin duplicar guardas)
-        if (!genero || typeof genero !== 'string' || genero.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo genero es obligatorio y debe ser texto.' });
-        }
-
-        const value = genero.trim();
-
-        const maxLength = getMaxLength('genero');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo genero no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.genero).trim();
 
         // Búsqueda, verificación de duplicado y actualización en una sola transacción
         const generoActualizado = await sequelize.transaction(async (t) => {
@@ -207,29 +169,7 @@ export const generoPut = async (req, res, next) => {
 export const generoPatch = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
-
-        const { genero } = req.body;
-
-        // El campo es el único actualizable; debe estar presente
-        if (genero === undefined || genero === null) {
-            return res.status(400).json({ success: false, message: 'El campo genero es requerido.' });
-        }
-        if (typeof genero !== 'string' || genero.trim() === '') {
-            return res.status(400).json({ success: false, message: 'El campo genero debe ser texto no vacío.' });
-        }
-
-        const value = genero.trim();
-
-        const maxLength = getMaxLength('genero');
-        if (value.length > maxLength) {
-            return res.status(400).json({
-                success: false,
-                message: `El campo genero no puede exceder ${maxLength} caracteres.`
-            });
-        }
+        const value = String(req.body.genero).trim();
 
         const updated = await sequelize.transaction(async (t) => {
             const record = await Genero.findByPk(id, { transaction: t });
@@ -280,9 +220,6 @@ export const generoPatch = async (req, res, next) => {
 export const generoDelete = async (req, res, next) => {
     try {
         const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ success: false, message: 'ID inválido. Debe ser un entero positivo.' });
-        }
 
         const deleted = await sequelize.transaction(async (t) => {
             const record = await Genero.findByPk(id, { transaction: t });

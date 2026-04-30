@@ -10,15 +10,21 @@ const Vistas = sequelize.define('Vistas', {
         allowNull: false
     },
     vista: {
-        type: DataTypes.STRING,
-        length: 50,
+        type: DataTypes.STRING(50),
         allowNull: false
     }
 },
 {
     timestamps: false,
-    tableName: 'Vistas'
+    tableName: 'Vistas',
+    indexes: [
+        { name: 'Idx_Vista', fields: ['id_vista'] }
+    ]
 });
+
+Vistas.associate = (models) => {
+    Vistas.hasMany(models.MatrizAccesos, { foreignKey: 'id_vista', sourceKey: 'id_vista' });
+};
 
 export default Vistas;
 

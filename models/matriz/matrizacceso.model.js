@@ -11,26 +11,31 @@ const MatrizAccesos = sequelize.define('MatrizAccesos', {
     },
     id_tipousuario: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: { model: 'TiposUsuarios', key: 'id_tipousuario' }
     },
     id_vista: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: { model: 'Vistas', key: 'id_vista' }
     },
     estatus: {
         type: DataTypes.BOOLEAN,
-        allowNull: false
+        allowNull: true
     }
 },
 {
     timestamps: false,
     tableName: 'MatrizAccesos',
     indexes: [
-        { unique: true, fields: ['id_tipousuario', 'id_vista'] }
+        { name: 'Idx_MatrizAcceso', fields: ['id_matrizacceso'] }
     ]
 });
+
+MatrizAccesos.associate = (models) => {
+    MatrizAccesos.belongsTo(models.TiposUsuarios, { foreignKey: 'id_tipousuario', targetKey: 'id_tipousuario' });
+    MatrizAccesos.belongsTo(models.Vistas, { foreignKey: 'id_vista', targetKey: 'id_vista' });
+};
 
 export default MatrizAccesos;
 

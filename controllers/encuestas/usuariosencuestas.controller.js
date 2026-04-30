@@ -11,69 +11,36 @@ const ALLOWED_SORT_FIELDS = [
 ];
 const DEFAULT_SORT_FIELD = 'id_usuario_encuesta';
 
-// ─── Utilidad: valida que un string sea una fecha ISO 8601 parseable ──────────
-const isValidDate = (value) => {
-    if (!value || typeof value !== 'string') return false;
-    const d = new Date(value);
-    return !isNaN(d.getTime());
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /usuariosencuestas  →  lista paginada con filtros y ordenamiento
 // ─────────────────────────────────────────────────────────────────────────────
 export const usuariosencuestasGet = async (req, res, next) => {
     try {
-        // Paginación segura
-        const page   = Math.max(1, parseInt(req.query.page,  10) || 1);
-        const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+        // Parametros ya validados/sanitizados por middleware
+        const page   = req.query.page || 1;
+        const limit  = req.query.limit || 10;
         const offset = (page - 1) * limit;
 
         const where = {};
 
         // Filtro opcional por id_usuario
         if (req.query.id_usuario !== undefined) {
-            const idUsr = parseInt(req.query.id_usuario, 10);
-            if (!Number.isInteger(idUsr) || idUsr <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El parámetro id_usuario debe ser un entero positivo'
-                });
-            }
-            where.id_usuario = idUsr;
+            where.id_usuario = req.query.id_usuario;
         }
 
         // Filtro opcional por id_encuesta
         if (req.query.id_encuesta !== undefined) {
-            const idEnc = parseInt(req.query.id_encuesta, 10);
-            if (!Number.isInteger(idEnc) || idEnc <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El parámetro id_encuesta debe ser un entero positivo'
-                });
-            }
-            where.id_encuesta = idEnc;
+            where.id_encuesta = req.query.id_encuesta;
         }
 
         // Filtro opcional por rango de fechas
         if (req.query.fecha_desde || req.query.fecha_hasta) {
             const fechaWhere = {};
             if (req.query.fecha_desde) {
-                if (!isValidDate(req.query.fecha_desde)) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'El parámetro fecha_desde no es una fecha válida'
-                    });
-                }
-                fechaWhere[Op.gte] = new Date(req.query.fecha_desde);
+                fechaWhere[Op.gte] = req.query.fecha_desde;
             }
             if (req.query.fecha_hasta) {
-                if (!isValidDate(req.query.fecha_hasta)) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'El parámetro fecha_hasta no es una fecha válida'
-                    });
-                }
-                fechaWhere[Op.lte] = new Date(req.query.fecha_hasta);
+                fechaWhere[Op.lte] = req.query.fecha_hasta;
             }
             where.fecha_elaboracion_encuesta = fechaWhere;
         }
@@ -111,13 +78,7 @@ export const usuariosencuestasGet = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const usuariosencuestaGetById = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         // Lectura simple: sin transacción explícita
         const registro = await UsuariosEncuestas.findByPk(id);
@@ -142,33 +103,9 @@ export const usuariosencuestaGetById = async (req, res, next) => {
 export const usuariosencuestaPost = async (req, res, next) => {
     try {
         const { id_usuario, id_encuesta, fecha_elaboracion_encuesta } = req.body;
-
-        // ── Validación: id_usuario ───────────────────────────────────────────
-        const idUsr = parseInt(id_usuario, 10);
-        if (!Number.isInteger(idUsr) || idUsr <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_usuario debe ser un entero positivo'
-            });
-        }
-
-        // ── Validación: id_encuesta ──────────────────────────────────────────
-        const idEnc = parseInt(id_encuesta, 10);
-        if (!Number.isInteger(idEnc) || idEnc <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_encuesta debe ser un entero positivo'
-            });
-        }
-
-        // ── Validación: fecha_elaboracion_encuesta ───────────────────────────
-        if (!isValidDate(fecha_elaboracion_encuesta)) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo fecha_elaboracion_encuesta es obligatorio y debe ser una fecha válida (ISO 8601)'
-            });
-        }
-        const fechaVal = new Date(fecha_elaboracion_encuesta);
+        const idUsr = id_usuario;
+        const idEnc = id_encuesta;
+        const fechaVal = fecha_elaboracion_encuesta;
 
         // Verificar duplicado: combinación única id_usuario + id_encuesta
         const exists = await UsuariosEncuestas.findOne({
@@ -209,40 +146,12 @@ export const usuariosencuestaPost = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const usuariosencuestaPut = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const { id_usuario, id_encuesta, fecha_elaboracion_encuesta } = req.body;
-
-        // ── Validaciones ─────────────────────────────────────────────────────
-        const idUsr = parseInt(id_usuario, 10);
-        if (!Number.isInteger(idUsr) || idUsr <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_usuario debe ser un entero positivo'
-            });
-        }
-
-        const idEnc = parseInt(id_encuesta, 10);
-        if (!Number.isInteger(idEnc) || idEnc <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo id_encuesta debe ser un entero positivo'
-            });
-        }
-
-        if (!isValidDate(fecha_elaboracion_encuesta)) {
-            return res.status(400).json({
-                success: false,
-                message: 'El campo fecha_elaboracion_encuesta es obligatorio y debe ser una fecha válida (ISO 8601)'
-            });
-        }
-        const fechaVal = new Date(fecha_elaboracion_encuesta);
+        const idUsr = id_usuario;
+        const idEnc = id_encuesta;
+        const fechaVal = fecha_elaboracion_encuesta;
 
         const actualizado = await sequelize.transaction(async (t) => {
             const registro = await UsuariosEncuestas.findByPk(id, { transaction: t });
@@ -300,61 +209,23 @@ export const usuariosencuestaPut = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const usuariosencuestaPatch = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const { id_usuario, id_encuesta, fecha_elaboracion_encuesta } = req.body;
-
-        // Al menos un campo debe venir en el body
-        if (
-            id_usuario                  === undefined &&
-            id_encuesta                 === undefined &&
-            fecha_elaboracion_encuesta  === undefined
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: 'Debe proporcionar al menos un campo: id_usuario, id_encuesta, fecha_elaboracion_encuesta'
-            });
-        }
 
         // ── Validaciones de los campos presentes ─────────────────────────────
         const updates = {};
 
         if (id_usuario !== undefined) {
-            const idUsr = parseInt(id_usuario, 10);
-            if (!Number.isInteger(idUsr) || idUsr <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_usuario debe ser un entero positivo'
-                });
-            }
-            updates.id_usuario = idUsr;
+            updates.id_usuario = id_usuario;
         }
 
         if (id_encuesta !== undefined) {
-            const idEnc = parseInt(id_encuesta, 10);
-            if (!Number.isInteger(idEnc) || idEnc <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo id_encuesta debe ser un entero positivo'
-                });
-            }
-            updates.id_encuesta = idEnc;
+            updates.id_encuesta = id_encuesta;
         }
 
         if (fecha_elaboracion_encuesta !== undefined) {
-            if (!isValidDate(fecha_elaboracion_encuesta)) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'El campo fecha_elaboracion_encuesta debe ser una fecha válida (ISO 8601)'
-                });
-            }
-            updates.fecha_elaboracion_encuesta = new Date(fecha_elaboracion_encuesta);
+            updates.fecha_elaboracion_encuesta = fecha_elaboracion_encuesta;
         }
 
         const actualizado = await sequelize.transaction(async (t) => {
@@ -411,13 +282,7 @@ export const usuariosencuestaPatch = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const usuariosencuestaDelete = async (req, res, next) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'ID inválido: debe ser un entero positivo'
-            });
-        }
+        const { id } = req.params;
 
         const eliminado = await sequelize.transaction(async (t) => {
             const registro = await UsuariosEncuestas.findByPk(id, { transaction: t });

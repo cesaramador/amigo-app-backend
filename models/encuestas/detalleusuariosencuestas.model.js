@@ -4,21 +4,46 @@ import { sequelize } from '../../database/mysql.js';  // Importante: importar { 
 const DetalleUsuariosEncuestas = sequelize.define('DetalleUsuariosEncuestas', {
     id_detalle_usuario_encuesta: {
         type: DataTypes.INTEGER,
-        AUTO_INCREMENT: true,
+        autoIncrement: true,
         primaryKey: true,
         allowNull: false
     },
     id_usuario_encuesta: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'UsuariosEncuestas',
+            key: 'id_usuario_encuesta'
+        }
     },
     id_encuesta_pregunta_respuesta: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+            model: 'EncuestasPreguntasRespuestas',
+            key: 'id_encuesta_pregunta_respuesta'
+        }
     }
 }, {
     timestamps: false,
-    tableName: 'DetalleUsuariosEncuestas'
+    tableName: 'DetalleUsuariosEncuestas',
+    indexes: [
+        {
+            name: 'Idx_DetalleUsuarioEncuesta',
+            fields: ['id_detalle_usuario_encuesta', 'id_usuario_encuesta', 'id_encuesta_pregunta_respuesta']
+        }
+    ]
 });
+
+DetalleUsuariosEncuestas.associate = (models) => {
+    DetalleUsuariosEncuestas.belongsTo(models.UsuariosEncuestas, {
+        foreignKey: 'id_usuario_encuesta',
+        targetKey: 'id_usuario_encuesta'
+    });
+    DetalleUsuariosEncuestas.belongsTo(models.EncuestasPreguntasRespuestas, {
+        foreignKey: 'id_encuesta_pregunta_respuesta',
+        targetKey: 'id_encuesta_pregunta_respuesta'
+    });
+};
 
 export default DetalleUsuariosEncuestas;

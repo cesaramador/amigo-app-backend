@@ -17,7 +17,14 @@ const CategoriasViviendas = sequelize.define('CategoriasViviendas', {
 },
 {
     timestamps: false,
-    tableName: 'CategoriasViviendas'
+    tableName: 'CategoriasViviendas',
+    indexes: [
+        { name: 'Idx_CategoriaVivienda', fields: ['id_categoriavivienda'] }
+    ]
 });
+
+CategoriasViviendas.associate = (models) => {
+    CategoriasViviendas.hasMany(models.Usuarios, { foreignKey: 'id_categoria_vivienda', sourceKey: 'id_categoriavivienda' });
+};
 
 export default CategoriasViviendas;
