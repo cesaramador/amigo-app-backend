@@ -29,7 +29,7 @@ authRouter.post("/registrar", registrarValidation, registrar);
 // iniciar sesión
 authRouter.post("/iniciar", iniciarValidation, iniciar);
 
-// path : /api/v1/auth/recuperar-codigo (POST)
+// path : /api/v1/auth/recuperarcodigo (POST)
 // recuperar código de acceso por teléfono + email (sin autorizaAcceso)
 authRouter.post("/recuperarcodigo", validarRecuperacionCodigo, recuperarCodigo);
 
