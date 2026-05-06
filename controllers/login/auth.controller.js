@@ -158,17 +158,12 @@ export const iniciar = async (req, res) => {
 
         // NOTA: Asegurarse de que el middleware express-session esté configurado en app.js
         if (req.session) {
-            // req.session.amigo = req.sessionID;
-            // req.session.usuario = user.telefono_personal;
             req.session.amigo = req.sessionID;
             req.session.usuario = user.telefono_personal;
             req.session.id_usuario = user.id_usuario;
             req.session.id_tipousuario = user.id_tipousuario;
         }
         
-        // const idSession = req.session?.amigo || 'No session set';
-        // const userSession = req.session?.usuario || 'No session set';
-
         // Obtener matriz de acceso
         let matrizacceso = [];
         try {
@@ -182,11 +177,6 @@ export const iniciar = async (req, res) => {
             success: true,
             message: "Inicio de sesión exitoso.",
             data: {
-                // token,
-                // idSession,
-                // userSession,
-                // matrizacceso,
-                // user: userSafe
                 token,
                 idSession: req.sessionID,
                 userSession: user.telefono_personal,
@@ -206,7 +196,6 @@ export const iniciar = async (req, res) => {
 // Recupera y regenera código de acceso por teléfono + email
 // ─────────────────────────────────────────────────────────────────────────────
 const ID_ESTATUS_USUARIO_ACTIVO = 1;
-const TEXTO_ESTATUS_USUARIO_ACTIVO = "activo";
 
 export const recuperarCodigo = async (req, res) => {
     try {
@@ -230,21 +219,7 @@ export const recuperarCodigo = async (req, res) => {
             return res.status(403).json({
                 success: false,
                 message:
-                    "No puede recuperar el código: su cuenta debe tener estatus de usuario activo (identificador 1). Su cuenta no cumple ese requisito."
-            });
-        }
-
-        const estatusRow = await EstatusUsuarios.findByPk(record.id_estatus_usuario);
-        const textoEstatus =
-            estatusRow?.estatus_usuario != null
-                ? String(estatusRow.estatus_usuario).trim().toLowerCase()
-                : "";
-
-        if (!estatusRow || textoEstatus !== TEXTO_ESTATUS_USUARIO_ACTIVO) {
-            return res.status(403).json({
-                success: false,
-                message:
-                    "No puede recuperar el código: en el sistema el estatus de su usuario debe ser \"activo\" y el identificador 1. Consulte a un administrador si cree que es un error."
+                    "No puede recuperar el código: en el sistema el estatus de su usuario debe ser \"activo\". Consulte al INAPAM si cree que es un error."
             });
         }
 
@@ -275,36 +250,6 @@ export const recuperarCodigo = async (req, res) => {
         return res.status(500).json({ success: false, message: "Error interno al recuperar el código de acceso." });
     }
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /api/v1/auth/abandonar
-// Endpoint de cierre de sesión (Logout)
-// ─────────────────────────────────────────────────────────────────────────────
-// export const abandonar = async (req, res) => {
-//     try {
-//         res.clearCookie("valor", { httpOnly: true, secure: false, sameSite: "lax" });
-
-//         // Destruir la sesión
-//         if (req.session) {
-//             req.session.destroy((err) => {
-//                 if (err) {
-//                     console.error("Error al destruir sesión:", err);
-//                     return res.status(500).json({ success: false, message: "No se pudo cerrar la sesión correctamente." });
-//                 }
-//                 // Limpiar cookie de sesión (connect.sid)
-//                 res.clearCookie("connect.sid", { httpOnly: true, secure: false, sameSite: "lax" });
-//                 return res.status(200).json({ success: true, message: "Sesión cerrada correctamente." });
-//             });
-//         } else {
-//             // Si no había sesión, igual respondemos ok
-//             return res.status(200).json({ success: true, message: "No había sesión activa, pero el cierre se procesó." });
-//         }
-
-//     } catch (error) {
-//         console.error("Error en abandonar():", error);
-//         return res.status(500).json({ success: false, message: "Error interno al cerrar sesión." });
-//     }
-// };
 
 export const abandonar = async (req, res) => {
     try {
